@@ -1,0 +1,11 @@
+# request fields
+string e_stop_name
+bool e_stop_value
+---
+#response constants
+int8 SUCCESS=0
+int8 FAILURE=1
+int8 INVALID_ESTOP_NAME=2
+
+# response fields
+int8 result
