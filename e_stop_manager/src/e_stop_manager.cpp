@@ -18,10 +18,10 @@ EStopManager::EStopManager( ros::NodeHandle& nh, ros::NodeHandle& pnh ) : nh_( n
 
   // init topics
   std::string list_topic = pnh_.param<std::string>( "e_stop_list_topic", "e_stop_list" );
-  e_stop_list_pub_ = nh_.advertise<e_stop_manager_msgs::EStopList>( list_topic, 5, true );
+  e_stop_list_pub_ = pnh_.advertise<e_stop_manager_msgs::EStopList>( list_topic, 5, true );
 
   std::string e_stop_topic = pnh_.param<std::string>( "e_stop_topic", "e_stop" );
-  e_stop_pub_ = nh_.advertise<std_msgs::Bool>( e_stop_topic, 5, true );
+  e_stop_pub_ = pnh_.advertise<std_msgs::Bool>( e_stop_topic, 5, true );
 }
 
 
