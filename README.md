@@ -7,7 +7,7 @@ The E-Stop Manager merges multiple E-Stop sources.
 * **init_e_stop_value:** bool, all e-stop values are set to this value on init
 * **e_stop_list:** list of all e-stop names
 
-<br>
+
 ### Set e-stop value
 The sources can make service calls on service "/e_stop_manager/set_e_stop" to set the e-stop value. The service has the following parameters:
 
