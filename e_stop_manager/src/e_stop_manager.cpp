@@ -3,39 +3,63 @@
 namespace e_stop_manager
 {
 
-EStopManager::EStopManager( ros::NodeHandle& nh, ros::NodeHandle& pnh ) : nh_( nh ), pnh_( pnh )
+EStopManager::EStopManager( ros::NodeHandle &nh, ros::NodeHandle &pnh ) : nh_( nh ), pnh_( pnh )
 {
-  // get e_stop names and set init values
-  e_stop_names_ = pnh_.param<std::vector<std::string>>( "e_stop_list", std::vector<std::string>());
+  e_stop_pub_ = pnh_.advertise<std_msgs::Bool>( "e_stop", 5, true );
+  e_stop_list_pub_ = pnh_.advertise<e_stop_manager_msgs::EStopList>( "e_stop_list", 5, true );
 
-  bool init_e_stop_value = pnh_.param<bool>( "init_e_stop_value", true );
-  e_stop_values_.resize( e_stop_names_.size(), init_e_stop_value );
+  XmlRpc::XmlRpcValue e_stop_list;
+  if ( !pnh_.getParam( "e_stop_list", e_stop_list ))
+  {
+    ROS_ERROR_NAMED( "e_stop_manager", "Parameter e_stop_list not provided!" );
+    publishEStops( true );
+    return;
+  }
+  if ( e_stop_list.getType() != XmlRpc::XmlRpcValue::TypeArray )
+  {
+    ROS_ERROR_NAMED( "e_stop_manager", "Parameter e_stop_list is not a list!" );
+    publishEStops( true );
+    return;
+  }
 
+  for ( size_t i = 0; i < e_stop_list.size(); ++i )
+  {
+    XmlRpc::XmlRpcValue entry = e_stop_list[i];
+    if ( !entry.hasMember( "name" ))
+    {
+      ROS_WARN_NAMED( "e_stop_manager", "Parameter e_stop_list contains entry without name! Ignored." );
+      continue;
+    }
+    e_stop_list_msg_.names.push_back( entry["name"] );
+    // If value is omitted, set to true per default
+    e_stop_list_msg_.values.push_back( !entry.hasMember( "value" ) || (bool) entry["value"] );
+  }
+  if ( e_stop_list.getType() != XmlRpc::XmlRpcValue::TypeArray )
+  {
+    ROS_ERROR_NAMED( "e_stop_manager", "No valid e_stop in list!" );
+    publishEStops( true );
+    return;
+  }
 
   // init service
-  set_e_stop_service_ = pnh_.advertiseService( "set_e_stop", &EStopManager::SetEStopServiceCB, this );
+  set_e_stop_service_ = pnh_.advertiseService( "set_e_stop", &EStopManager::setEStopServiceCB, this );
 
-
-  // init topics
-  std::string list_topic = pnh_.param<std::string>( "e_stop_list_topic", "e_stop_list" );
-  e_stop_list_pub_ = pnh_.advertise<e_stop_manager_msgs::EStopList>( list_topic, 5, true );
-
-  std::string e_stop_topic = pnh_.param<std::string>( "e_stop_topic", "e_stop" );
-  e_stop_pub_ = pnh_.advertise<std_msgs::Bool>( e_stop_topic, 5, true );
+  publishEStops();
+  ROS_INFO_NAMED( "e_stop_manager", "e_stop_manager initialized!" );
 }
 
 
-bool EStopManager::SetEStopServiceCB( e_stop_manager_msgs::SetEStop::Request& request,
-                                      e_stop_manager_msgs::SetEStop::Response& response )
+bool EStopManager::setEStopServiceCB( e_stop_manager_msgs::SetEStop::Request &request,
+                                      e_stop_manager_msgs::SetEStop::Response &response )
 {
   bool name_found = false;
 
   // search for name, set its corresponding value
-  for ( int i = 0; i < e_stop_names_.size(); i++ )
+  for ( int i = 0; i < e_stop_list_msg_.names.size(); i++ )
   {
-    if ( e_stop_names_[i] == request.e_stop_name )
+    if ( e_stop_list_msg_.names[i] == request.name )
     {
-      e_stop_values_[i] = request.e_stop_value;
+      e_stop_list_msg_.values[i] = request.value;
       name_found = true;
       break;
     }
@@ -43,26 +67,27 @@ bool EStopManager::SetEStopServiceCB( e_stop_manager_msgs::SetEStop::Request& re
 
   if ( !name_found )
   {
-    ROS_ERROR_STREAM( "e_stop_manager: e_stop_name " + request.e_stop_name + " not found!" );
+    ROS_ERROR_STREAM_NAMED( "e_stop_manager", "EStop : '" << request.name << "' not found!" );
     response.result = response.INVALID_ESTOP_NAME;
     return true; // return true so that caller gets error code
   }
 
-
-
-  // publish e_stop name and value lists
-  e_stop_list_msg_.e_stop_names = e_stop_names_;
-  e_stop_list_msg_.e_stop_values = e_stop_values_;
-  e_stop_list_pub_.publish( e_stop_list_msg_ );
-
-  // publish accumulated e_stop message
-  // check if any values is true (estop pressed) --> publish true
-  e_stop_msg_.data = std::any_of( e_stop_values_.begin(), e_stop_values_.end(), []( bool v ) { return v; } );
-  e_stop_pub_.publish( e_stop_msg_ );
-
+  publishEStops();
 
   response.result = response.SUCCESS;
-
   return true;
+}
+
+void EStopManager::publishEStops( bool force_e_stop )
+{
+
+  // publish e_stop name and value lists
+  e_stop_list_pub_.publish( e_stop_list_msg_ );
+  // publish accumulated e_stop message
+  // check if any values is true (estop pressed) --> publish true
+  std_msgs::Bool msg;
+  msg.data = force_e_stop ||
+             std::any_of( e_stop_list_msg_.values.begin(), e_stop_list_msg_.values.end(), []( bool v ) { return v; } );
+  e_stop_pub_.publish( msg );
 }
 }

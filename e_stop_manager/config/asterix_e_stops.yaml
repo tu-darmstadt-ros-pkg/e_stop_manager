@@ -1,11 +1,9 @@
-e_stop_list_topic: "e_stop_list"
-e_stop_topic: "e_stop"
-
-# true = e-stop pressed
-init_e_stop_value: "true"
-
 e_stop_list:
-  - "hard_remote_e_stop"
-  - "soft_remote_e_stop"
-  - "big_red_button_e_stop"
-  - "ui_e_stop"
+  - name: "hard_remote_e_stop"
+    value: true
+  - name: "soft_remote_e_stop"
+    value: true
+  - name: "big_red_button_e_stop"
+    value: true
+  - name: "ui_e_stop"
+    value: false

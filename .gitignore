@@ -1,0 +1,9 @@
+# Ignore CLion config files
+.idea/
+# Clion build files
+cmake-build-*/
+
+# Generated documentation
+doc/
+
+*.qmlc

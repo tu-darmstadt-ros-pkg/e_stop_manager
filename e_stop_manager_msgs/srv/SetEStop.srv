@@ -1,6 +1,6 @@
 # request fields
-string e_stop_name
-bool e_stop_value
+string name
+bool value
 ---
 #response constants
 int8 SUCCESS=0
