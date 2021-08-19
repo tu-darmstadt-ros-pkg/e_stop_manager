@@ -1,9 +1,9 @@
 e_stop_list:
   - name: "hard_remote_e_stop"
-    value: true
+    value: false
   - name: "soft_remote_e_stop"
-    value: true
+    value: false
   - name: "big_red_button_e_stop"
-    value: true
+    value: false
   - name: "ui_e_stop"
     value: false
