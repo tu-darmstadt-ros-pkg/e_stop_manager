@@ -16,7 +16,7 @@ public:
   EStopManager( ros::NodeHandle& nh, ros::NodeHandle& pnh );
 
 private:
-  void publishEStops( bool force_e_stop = false);
+  void publishEStops( bool force_e_stop = false );
 
   bool setEStopServiceCB( e_stop_manager_msgs::SetEStop::Request& request,
                           e_stop_manager_msgs::SetEStop::Response& response );
@@ -31,7 +31,7 @@ private:
   e_stop_manager_msgs::EStopList e_stop_list_msg_;
   ros::Publisher e_stop_list_pub_;
 
-  ros::Publisher e_stop_pub_;
+  std::map<ros::Publisher, std::vector<std::string>> e_stop_pub_;
 };
 }
 

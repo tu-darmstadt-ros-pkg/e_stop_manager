@@ -1,3 +1,5 @@
+# Each e-stop name in e_stop_topics needs to be in e_stop_list!
+
 e_stop_list:
   - name: "hard_remote_e_stop"
     value: false
@@ -7,3 +9,11 @@ e_stop_list:
     value: false
   - name: "ui_e_stop"
     value: false
+
+e_stop_topics:
+  - e_stop_hw:
+    - "big_red_button_e_stop"
+    - "hard_remote_e_stop"
+  - e_stop_sw:
+    - "soft_remote_e_stop"
+    - "ui_e_stop"
