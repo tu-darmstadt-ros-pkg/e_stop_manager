@@ -77,9 +77,9 @@ EStopManager::EStopManager( ros::NodeHandle& nh, ros::NodeHandle& pnh ) : nh_( n
     e_stop_list_msg_.values.push_back( !entry.hasMember( "value" ) || (bool) entry["value"] );
   }
 
-  // TODO this is redundant, maybe it was intended to use condition "e_stop_list_msg_.names.empty()" ?
+
   // check if there was a valid e-stop
-  if ( e_stop_list.getType() != XmlRpc::XmlRpcValue::TypeArray )
+  if ( e_stop_list_msg_.names.empty() )
   {
     ROS_ERROR_NAMED( "e_stop_manager", "No valid e_stop in list!" );
     publishEStops( true );
