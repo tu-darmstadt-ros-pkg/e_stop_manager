@@ -1,0 +1,9 @@
+# Each e-stop name in e_stop_topics needs to be in e_stop_list!
+
+e_stop_list:
+  - name: "ui_e_stop"
+    value: false
+
+e_stop_topics:
+  - e_stop_sw:
+    - "ui_e_stop"
