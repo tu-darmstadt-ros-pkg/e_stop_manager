@@ -127,6 +127,7 @@ EStopManager::EStopManager( ros::NodeHandle& nh, ros::NodeHandle& pnh ) : nh_( n
 bool EStopManager::setEStopServiceCB( e_stop_manager_msgs::SetEStop::Request& request,
                                       e_stop_manager_msgs::SetEStop::Response& response )
 {
+  ROS_DEBUG_STREAM_NAMED("e_stop_manager", "EStop '" << request.name + "' sent value: " << (int)request.value << ".");
 
   bool name_found = false;
 
