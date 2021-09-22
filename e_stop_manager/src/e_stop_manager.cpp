@@ -128,8 +128,6 @@ bool EStopManager::setEStopServiceCB( e_stop_manager_msgs::SetEStop::Request& re
                                       e_stop_manager_msgs::SetEStop::Response& response )
 {
 
-  ROS_INFO_STREAM_NAMED("e_stop_manager", "EStop with name " << request.name + " sent value: " << (int)request.value << ".");
-
   bool name_found = false;
 
   // search for name, set its corresponding value
@@ -137,6 +135,13 @@ bool EStopManager::setEStopServiceCB( e_stop_manager_msgs::SetEStop::Request& re
   {
     if ( e_stop_list_msg_.names[i] == request.name )
     {
+      // if value has not changed, do nothing and return
+      if(e_stop_list_msg_.values[i] == request.value)
+      {
+        response.result = response.SUCCESS;
+        return true;
+      }
+
       e_stop_list_msg_.values[i] = request.value;
       name_found = true;
       break;
@@ -151,6 +156,8 @@ bool EStopManager::setEStopServiceCB( e_stop_manager_msgs::SetEStop::Request& re
   }
 
   publishEStops();
+
+  ROS_INFO_STREAM_NAMED("e_stop_manager", "EStop '" << request.name + "' sent value: " << (int)request.value << ".");
 
   response.result = response.SUCCESS;
   return true;
