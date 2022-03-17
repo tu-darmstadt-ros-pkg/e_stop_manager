@@ -3,5 +3,6 @@
 <launch>
   <node name="e_stop_manager" pkg="e_stop_manager" type="e_stop_manager_node" respawn="true" output="screen">
     <rosparam file="$(find e_stop_manager)/config/telemax_e_stops.yaml" />
+    <remap from="~e_stop_sw" to="/emergency_stop_software"/>
   </node>
 </launch>
