@@ -3,8 +3,5 @@
 <launch>
   <node name="e_stop_manager" pkg="e_stop_manager" type="e_stop_manager_node" respawn="true" output="screen">
     <rosparam file="$(find e_stop_manager)/config/asterix_e_stops.yaml" />
-
-    <remap from="~e_stop_sw" to="/emergency_stop_software"/>
-    <remap from="~e_stop_hw" to="/emergency_stop_hardware"/>
   </node>
 </launch>
