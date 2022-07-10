@@ -11,9 +11,11 @@ e_stop_list:
     value: false
 
 e_stop_topics:
-  - e_stop_hw:
-    - "big_red_button_e_stop"
-    - "hard_remote_e_stop"
-  - e_stop_sw:
-    - "soft_remote_e_stop"
-    - "ui_e_stop"
+  - name: "/emergency_stop_hardware"
+    e_stops:
+      - "big_red_button_e_stop"
+      - "hard_remote_e_stop"
+  - name: "/emergency_stop_software"
+    e_stops:
+      - "soft_remote_e_stop"
+      - "ui_e_stop"

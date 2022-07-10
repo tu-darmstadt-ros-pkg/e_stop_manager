@@ -5,5 +5,6 @@ e_stop_list:
     value: false
 
 e_stop_topics:
-  - e_stop_sw:
-    - "ui_e_stop"
+  - name: "/emergency_stop_software"
+    e_stops:
+      - "ui_e_stop"

@@ -19,31 +19,39 @@ EStopManager::EStopManager( ros::NodeHandle& nh, ros::NodeHandle& pnh ) : nh_( n
   }
   else
   {
+    if ( e_stop_topics.getType() != XmlRpc::XmlRpcValue::TypeArray )
+    {
+      throw std::invalid_argument( "e_stop_manager: Parameter e_stop_list is not a list!" );
+    }
 
     // get topic names and names of e-stops which should be published on these topics
     for ( size_t i = 0; i < e_stop_topics.size(); ++i )
     {
-
-      // here there is only one entry per list entry (e.g. not as in e_stop_list where there are two entries (name and value) per list entry)
-      for ( auto& it : e_stop_topics[i] )
+      XmlRpc::XmlRpcValue entry = e_stop_topics[i];
+      if ( !entry.hasMember( "name" ))
       {
-        std::string topic_name = it.first;
-
-        XmlRpc::XmlRpcValue e_stops = it.second;
-
-        // get e-stop names for current topic
-        std::vector<std::string> e_stop_names;
-
-        for ( size_t j = 0; j < e_stops.size(); ++j )
-        {
-          e_stop_names.push_back( e_stops[j] );
-        }
-
-        ros::Publisher pub = pnh_.advertise<std_msgs::Bool>( topic_name, 5, true );
-
-        // add publisher and its e-stop names to map
-        e_stop_pub_.emplace( pub, e_stop_names );
+        ROS_WARN_NAMED( "e_stop_manager", "Parameter e_stop_topics contains entry without name! Ignored." );
+        continue;
       }
+      std::string topic_name = entry["name"];
+      if ( !entry.hasMember( "e_stops" ))
+      {
+        ROS_WARN_NAMED( "e_stop_manager", "Parameter e_stop_topics contains entry without e_stops list! Ignored." );
+        continue;
+      }
+
+      // get e-stop names for current topic
+      std::vector<std::string> e_stop_names;
+      XmlRpc::XmlRpcValue e_stops = entry["e_stops"];
+      for ( size_t j = 0; j < e_stops.size(); ++j) {
+
+        e_stop_names.push_back( e_stops[j] );
+      }
+
+      ros::Publisher pub = pnh_.advertise<std_msgs::Bool>( topic_name, 5, true );
+
+      // add publisher and its e-stop names to map
+      e_stop_pub_.emplace( pub, e_stop_names );
     }
   }
 
