@@ -1,21 +1,16 @@
-# Each e-stop name in e_stop_topics needs to be in e_stop_list!
+# Each e-stop name in e_stop_names needs to be assigned to at least one <e_stop>_topic !
+e_stop_manager:
+  ros__parameters:
+    e_stop_names: ["hard_remote_e_stop", "soft_remote_e_stop", "big_red_button_e_stop", "ui_e_stop"]
 
-e_stop_list:
-  - name: "hard_remote_e_stop"
-    value: false
-  - name: "soft_remote_e_stop"
-    value: false
-  - name: "big_red_button_e_stop"
-    value: false
-  - name: "ui_e_stop"
-    value: false
+    e_stop_topics: ["/emergency_stop_hardware", "/emergency_stop_software"]
 
-e_stop_topics:
-  - name: "/emergency_stop_hardware"
-    e_stops:
-      - "big_red_button_e_stop"
-      - "hard_remote_e_stop"
-  - name: "/emergency_stop_software"
-    e_stops:
-      - "soft_remote_e_stop"
-      - "ui_e_stop"
+    hard_remote_e_stop_topic: "/emergency_stop_hardware"
+    soft_remote_e_stop_topic: "/emergency_stop_hardware"
+    big_red_button_e_stop_topic: "/emergency_stop_software"
+    ui_e_stop_topic: "/emergency_stop_software"
+
+    hard_remote_e_stop_start_value: false
+    soft_remote_e_stop_start_value: false
+    big_red_button_e_stop_start_value: false
+    ui_e_stop_start_value: false

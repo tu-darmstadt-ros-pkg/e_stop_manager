@@ -1,10 +1,10 @@
-# Each e-stop name in e_stop_topics needs to be in e_stop_list!
+# Each e-stop name in e_stop_names needs to be assigned to at least one <e_stop>_topic !
+e_stop_manager:
+  ros__parameters:
+    e_stop_names: [ "ui_e_stop"]
 
-e_stop_list:
-  - name: "ui_e_stop"
-    value: false
+    e_stop_topics: [ "/emergency_stop_software" ]
 
-e_stop_topics:
-  - name: "/emergency_stop_software"
-    e_stops:
-      - "ui_e_stop"
+    ui_e_stop_topic: "/emergency_stop_software"
+
+    ui_e_stop_start_value: false

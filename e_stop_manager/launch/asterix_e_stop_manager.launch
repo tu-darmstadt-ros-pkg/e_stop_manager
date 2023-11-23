@@ -1,7 +1,5 @@
-<?xml version="1.0"?>
-
 <launch>
-  <node name="e_stop_manager" pkg="e_stop_manager" type="e_stop_manager_node" respawn="true" output="screen">
-    <rosparam file="$(find e_stop_manager)/config/asterix_e_stops.yaml" />
+  <node name="e_stop_manager" pkg="e_stop_manager" exec="e_stop_manager_node">
+    <param from="$(find-pkg-share e_stop_manager)/config/asterix_e_stops.yaml" />
   </node>
 </launch>

@@ -1,29 +1,24 @@
-cmake_minimum_required(VERSION 3.0.2)
+cmake_minimum_required(VERSION 3.10)
 project(e_stop_manager_msgs)
 
+find_package(ament_cmake REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
 
-find_package(catkin REQUIRED COMPONENTS
-  message_generation
-  )
+###########
+## Build ##
+###########
 
+rosidl_generate_interfaces(${PROJECT_NAME}
+        "msg/EStopList.msg"
+        "srv/SetEStop.srv"
+        )
 
-add_message_files(FILES
-  EStopList.msg
-  )
+#############
+## Install ##
+#############
 
-add_service_files(FILES
-    SetEStop.srv
-  )
+install(DIRECTORY "msg" "srv"
+        DESTINATION "share/${PROJECT_NAME}"
+        )
 
-generate_messages()
-
-
-catkin_package(
-  CATKIN_DEPENDS message_runtime
-)
-
-
-include_directories(
-  ${catkin_INCLUDE_DIRS}
-)
-
+ament_package()

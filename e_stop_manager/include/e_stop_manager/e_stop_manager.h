@@ -1,38 +1,29 @@
-#ifndef E_STOP_MANAGER_E_STOP_MANAGER_H
-#define E_STOP_MANAGER_E_STOP_MANAGER_H
-
-#include <ros/ros.h>
-#include "std_msgs/Bool.h"
-
-#include "e_stop_manager_msgs/SetEStop.h"
-#include "e_stop_manager_msgs/EStopList.h"
+#include "rclcpp/rclcpp.hpp"
+#include "rclcpp/publisher.hpp"
+#include <e_stop_manager_msgs/srv/set_e_stop.hpp>
+#include <e_stop_manager_msgs/msg/e_stop_list.hpp>
+#include "std_msgs/msg/bool.hpp"
 
 namespace e_stop_manager
 {
 
-class EStopManager
-{
-public:
-  EStopManager( ros::NodeHandle& nh, ros::NodeHandle& pnh );
+    class EStopManager : public rclcpp::Node
+    {
+    public:
+        EStopManager(const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
 
-private:
-  void publishEStops( bool force_e_stop = false );
+    private:
+        void publishEStops( bool force_e_stop = false );
 
-  bool setEStopServiceCB( e_stop_manager_msgs::SetEStop::Request& request,
-                          e_stop_manager_msgs::SetEStop::Response& response );
-
-
-  ros::NodeHandle& nh_;
-  ros::NodeHandle& pnh_;
+        bool setEStopServiceCB(const std::shared_ptr<e_stop_manager_msgs::srv::SetEStop::Request> request,
+                                std::shared_ptr<e_stop_manager_msgs::srv::SetEStop::Response> response );
 
 
-  ros::ServiceServer set_e_stop_service_;
 
-  e_stop_manager_msgs::EStopList e_stop_list_msg_;
-  ros::Publisher e_stop_list_pub_;
+        rclcpp::Service<e_stop_manager_msgs::srv::SetEStop>::SharedPtr set_e_stop_service_;
 
-  std::map<ros::Publisher, std::vector<std::string>> e_stop_pub_;
-};
+        e_stop_manager_msgs::msg::EStopList e_stop_list_msg_;
+        rclcpp::Publisher<e_stop_manager_msgs::msg::EStopList>::SharedPtr e_stop_list_pub_;
+        std::map<std::shared_ptr<rclcpp::Publisher<std_msgs::msg::Bool>>, std::vector<std::string> > e_stop_pub_;
+    };
 }
-
-#endif

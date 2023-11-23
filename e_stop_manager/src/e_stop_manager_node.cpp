@@ -1,16 +1,16 @@
-#include <ros/ros.h>
+#include <rclcpp/rclcpp.hpp>
 #include "e_stop_manager/e_stop_manager.h"
 
-int main( int argc, char** argv )
+int main(int argc, char** argv)
 {
-  ros::init( argc, argv, ROS_PACKAGE_NAME );
+    rclcpp::init(argc, argv);
 
-  ros::NodeHandle nh;
-  ros::NodeHandle pnh( "~" );
+    rclcpp::executors::SingleThreadedExecutor exe;
+    auto e_stop_manager = std::make_shared<e_stop_manager::EStopManager>();
+    exe.add_node(e_stop_manager->get_node_base_interface());
+    exe.spin();
 
-  e_stop_manager::EStopManager e_stop_manager( nh, pnh );
+    rclcpp::shutdown();
 
-  ros::spin();
-
-  return 0;
+    return 0;
 }
