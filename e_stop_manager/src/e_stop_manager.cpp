@@ -5,17 +5,17 @@ namespace e_stop_manager
 {
 
     EStopManager::EStopManager(const rclcpp::NodeOptions & options):
-    Node("e_stop_manager", options)
+            node_(std::make_shared<rclcpp::Node>("e_stop_manager", options))
     {
-        this->declare_parameter<std::vector<std::string>>("e_stop_names",std::vector<std::string>{});
-        this->declare_parameter<std::vector<std::string>>("e_stop_topics",std::vector<std::string>{});
-        e_stop_list_pub_ = this->create_publisher<e_stop_manager_msgs::msg::EStopList>("e_stop_list", 5);
+        node_->declare_parameter<std::vector<std::string>>("e_stop_names",std::vector<std::string>{});
+        node_->declare_parameter<std::vector<std::string>>("e_stop_topics",std::vector<std::string>{});
+        e_stop_list_pub_ = node_->create_publisher<e_stop_manager_msgs::msg::EStopList>("e_stop_list", 5);
 
         rclcpp::Parameter e_stop_topics_param;
         std::vector<std::string> e_stop_topics;
         std::vector<std::string> e_stop_names;
         // load e-stop topics and names
-        if (this->get_parameter("e_stop_topics", e_stop_topics_param) && e_stop_topics_param.get_type() == rclcpp::ParameterType::PARAMETER_STRING_ARRAY)
+        if (node_->get_parameter("e_stop_topics", e_stop_topics_param) && e_stop_topics_param.get_type() == rclcpp::ParameterType::PARAMETER_STRING_ARRAY)
         {
             e_stop_topics = e_stop_topics_param.as_string_array();
         }
@@ -24,7 +24,7 @@ namespace e_stop_manager
             RCLCPP_ERROR(rclcpp::get_logger("e_stop_manager"), "Parameter e_stop_topic not provided or is not a list! E-stops will only be published on e-stop-list topic!");
         }
 
-        if (this->get_parameter("e_stop_names", e_stop_topics_param) && e_stop_topics_param.get_type() == rclcpp::ParameterType::PARAMETER_STRING_ARRAY)
+        if (node_->get_parameter("e_stop_names", e_stop_topics_param) && e_stop_topics_param.get_type() == rclcpp::ParameterType::PARAMETER_STRING_ARRAY)
         {
             e_stop_names = e_stop_topics_param.as_string_array();
         }
@@ -36,15 +36,15 @@ namespace e_stop_manager
         // declare parameters per e-stop
         for(const auto& e_stop_name: e_stop_names)
         {
-            this->declare_parameter<bool>(e_stop_name+"_start_value", false);
-            this->declare_parameter<std::string>(e_stop_name+"_topic", e_stop_topics.empty()?"missing_topics":e_stop_topics[0]);
+            node_->declare_parameter<bool>(e_stop_name+"_start_value", false);
+            node_->declare_parameter<std::string>(e_stop_name+"_topic", e_stop_topics.empty()?"missing_topics":e_stop_topics[0]);
         }
         std::map<std::string, std::vector<std::string>> e_stops_per_topic;
         std::map<std::string, bool> e_stops_start_values;
         for(const auto& e_stop_name:e_stop_names)
         {
-            e_stops_start_values[e_stop_name] = this->get_parameter(e_stop_name+"_start_value").as_bool();
-            std::string topic = this->get_parameter(e_stop_name+"_topic").as_string();
+            e_stops_start_values[e_stop_name] = node_->get_parameter(e_stop_name+"_start_value").as_bool();
+            std::string topic = node_->get_parameter(e_stop_name+"_topic").as_string();
             if(e_stops_per_topic.find(topic) != e_stops_per_topic.end())
             {
                 e_stops_per_topic[topic].push_back(e_stop_name);
@@ -58,7 +58,7 @@ namespace e_stop_manager
         // create publishers
         for (auto& entry : e_stop_topics)
         {
-            std::shared_ptr<rclcpp::Publisher<std_msgs::msg::Bool>> pub = this->create_publisher<std_msgs::msg::Bool>(entry, 5);
+            std::shared_ptr<rclcpp::Publisher<std_msgs::msg::Bool>> pub = node_->create_publisher<std_msgs::msg::Bool>(entry, 5);
 
             e_stop_pub_.emplace(pub,e_stops_per_topic[entry]);
         }
@@ -95,7 +95,7 @@ namespace e_stop_manager
                              pub.second.end());
         }
 
-        set_e_stop_service_ = this->create_service<e_stop_manager_msgs::srv::SetEStop>("set_e_stop", std::bind(&EStopManager::setEStopServiceCB, this, std::placeholders::_1, std::placeholders::_2));
+        set_e_stop_service_ = node_->create_service<e_stop_manager_msgs::srv::SetEStop>("set_e_stop", std::bind(&EStopManager::setEStopServiceCB, this, std::placeholders::_1, std::placeholders::_2));
 
         publishEStops();
         RCLCPP_INFO(rclcpp::get_logger("e_stop_manager"), "e_stop_manager initialized!");

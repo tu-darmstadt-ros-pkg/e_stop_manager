@@ -7,11 +7,15 @@
 namespace e_stop_manager
 {
 
-    class EStopManager : public rclcpp::Node
+    class EStopManager
     {
     public:
-        EStopManager(const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
+        explicit EStopManager(const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
 
+        // required if not subclassing Node, see https://github.com/ros2/demos/blob/humble/composition/src/node_like_listener_component.cpp
+        rclcpp::node_interfaces::NodeBaseInterface::SharedPtr get_node_base_interface() const {
+            return this->node_->get_node_base_interface();
+        }
     private:
         void publishEStops( bool force_e_stop = false );
 
@@ -25,5 +29,6 @@ namespace e_stop_manager
         e_stop_manager_msgs::msg::EStopList e_stop_list_msg_;
         rclcpp::Publisher<e_stop_manager_msgs::msg::EStopList>::SharedPtr e_stop_list_pub_;
         std::map<std::shared_ptr<rclcpp::Publisher<std_msgs::msg::Bool>>, std::vector<std::string> > e_stop_pub_;
+        rclcpp::Node::SharedPtr node_;
     };
 }
