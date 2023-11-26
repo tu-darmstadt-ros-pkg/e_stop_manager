@@ -1,5 +1,0 @@
-<launch>
-  <node name="e_stop_manager" pkg="e_stop_manager" exec="e_stop_manager_test">
-    <param from="$(find-pkg-share e_stop_manager)/config/asterix_e_stops.yaml" />
-  </node>
-</launch>

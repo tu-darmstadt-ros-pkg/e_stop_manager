@@ -45,7 +45,8 @@ def load_yaml(package_name, file_path):
 def generate_e_stop_test_description(*args,
                                      gtest_name: SomeSubstitutionsType):
     config = os.path.join(
-        get_package_share_directory('e_stop_manager'),
+        os.path.dirname(__file__),
+        "..",
         'config',
         'asterix_e_stops.yaml'
     )

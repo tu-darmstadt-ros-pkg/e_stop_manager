@@ -106,18 +106,18 @@ namespace e_stop_manager
             std::shared_ptr<e_stop_manager_msgs::srv::SetEStop::Response> response)
     {
 
-        RCLCPP_DEBUG(rclcpp::get_logger("e_stop_manager"), "EStop '%s' sent value: %d.", request->name.c_str(), request->value);
+        RCLCPP_INFO(rclcpp::get_logger("e_stop_manager"), "EStop '%s' sent value: %d.", request->name.c_str(), request->value);
 
         bool name_found = false;
 
         for (size_t i = 0; i < e_stop_list_msg_.names.size(); ++i)
         {
-            RCLCPP_INFO_STREAM(rclcpp::get_logger("e_stop_manager"),e_stop_list_msg_.names[i] );
             if (e_stop_list_msg_.names[i] == request->name)
             {
                 // if value has not changed, do nothing and return
                 if (e_stop_list_msg_.values[i] == request->value)
                 {
+                    RCLCPP_INFO(rclcpp::get_logger("e_stop_manager"), "Do nothing. Requested state already true");
                     response->result = response->SUCCESS;
                     return true;
                 }
