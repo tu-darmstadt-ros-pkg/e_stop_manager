@@ -15,6 +15,7 @@
   <buildtool_depend>ament_cmake</buildtool_depend>
   <depend>std_msgs</depend>
   <depend>e_stop_manager_msgs</depend>
+  <test_depend>ros_testing</test_depend>
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>
