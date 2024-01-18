@@ -5,6 +5,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(e_stop_manager_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(rclcpp_components REQUIRED)
 
 set(CMAKE_CXX_STANDARD 14)
 
@@ -14,15 +15,19 @@ set(CMAKE_CXX_STANDARD 14)
 
 include_directories(include)
 
+# library
 add_library(${PROJECT_NAME} SHARED
         src/e_stop_manager.cpp)
 ament_target_dependencies(${PROJECT_NAME}
         rclcpp
         e_stop_manager_msgs
+        rclcpp_components
         std_msgs
         )
+rclcpp_components_register_nodes(${PROJECT_NAME} "e_stop_manager::EStopManager")
 
 
+# node        
 add_executable(${PROJECT_NAME}_node src/e_stop_manager_node.cpp)
 target_link_libraries(${PROJECT_NAME}_node
         ${PROJECT_NAME}
