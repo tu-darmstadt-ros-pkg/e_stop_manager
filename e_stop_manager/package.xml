@@ -1,16 +1,12 @@
 <?xml version="1.0"?>
-<package format="2">
+<package format="3">
   <name>e_stop_manager</name>
   <version>1.0.0</version>
   <description>The e_stop_manager package</description>
 
-  <maintainer email="katrin.becker.17@stud-tu-darmstadt.de">Katrin</maintainer>
+  <maintainer email="aljoscha.schmidt@tu-darmstadt.de">Aljoscha Schmidt</maintainer>
 
-  <!-- One license tag required, multiple allowed, one license per tag -->
-  <!-- Commonly used license strings: -->
-  <!--   BSD, MIT, Boost Software License, GPLv2, GPLv3, LGPLv2.1, LGPLv3 -->
   <license>TODO</license>
-
 
   <buildtool_depend>ament_cmake</buildtool_depend>
   <depend>std_msgs</depend>
@@ -18,9 +14,7 @@
   <depend>rclcpp_components</depend>
   <test_depend>ros_testing</test_depend>
 
-  <!-- The export tag contains other, unspecified, tags -->
   <export>
-    <!-- Other tools can request additional information be placed here -->
     <build_type>ament_cmake</build_type>
   </export>
 </package>
