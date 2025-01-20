@@ -23,12 +23,16 @@ jobs:
       - name: Setup
         run: |
           sudo apt-get update && sudo apt-get install -y clang-format cppcheck libxml2-utils
-      - name: Lint C++
+      - name: Lint C++ code
         run: |
+          echo "Linting C++ code..."
           clang-format -Werror -n -style=file $(find . -name '*.cpp' -o -name '*.hpp' -o -name '*.h' -o -name '*.c' -o -name '*.cc')
-      - name: Check C++
+
+      - name: Run cppcheck on C++ code
         run: |
-          cppcheck --force --library=qt --quiet --error-exitcode=1 include src
+          echo "Running cppcheck on C++ code..."
+          cppcheck --force --quiet --error-exitcode=1 --language=c++ $(find . -name '*.cpp' -o -name '*.hpp' -o -name '*.h' -o -name '*.c' -o -name '*.cc')
+
       - name: Lint package.xml
         run: |
           xmllint --noout --schema http://download.ros.org/schema/package_format3.xsd $(find . -name 'package.xml')
