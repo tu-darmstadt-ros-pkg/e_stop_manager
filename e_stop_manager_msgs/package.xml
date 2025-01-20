@@ -4,11 +4,10 @@
   <version>0.0.0</version>
   <description>The e_stop_manager_msgs package</description>
 
-  <maintainer email="katrin.becker.17@stud-tu-darmstadt.de">Katrin Becker</maintainer>
+  <maintainer email="aljoscha.schmidt@tu-darmstadt.de">Aljoscha Schmidt</maintainer>
 
   <license>TODO</license>
 
-  <!-- Add any relevant URLs if needed -->
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
