@@ -94,10 +94,6 @@ All configuration is provided via ROS parameters.
 
 List of all E-stop source names.
 
-#### **`aggregated_topics`**
-
-List of aggregated group names (each becomes a published `Bool` topic).
-
 #### **`e_stop_config` (per source)**
 
 Each source must specify:
@@ -108,6 +104,8 @@ Each source must specify:
 | `tracked_topic`    | bool   | `true`: subscribe to `~/<name>`; `false`: managed source |
 | `initial_value`    | bool   | Startup state                                            |
 
+All aggregated groups are derived from the `aggregated_topic` values in `e_stop_config`, so no separate list is needed.
+
 ---
 
 # **Example Configuration**
@@ -116,8 +114,6 @@ Each source must specify:
 e_stop_manager:
   ros__parameters:
     e_stop_names: ["hard_remote_e_stop", "soft_remote_e_stop", "big_red_button_e_stop", "ui_e_stop"]
-
-    aggregated_topics: ["/emergency_stop_hardware", "/emergency_stop_software"]
 
     e_stop_config:
       hard_remote_e_stop:

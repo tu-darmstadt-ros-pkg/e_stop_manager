@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <set>
 
 namespace e_stop_manager
 {
@@ -18,16 +19,7 @@ EStopManager::EStopManager( const rclcpp::NodeOptions &options )
 
   e_stop_list_pub_ = node_->create_publisher<e_stop_manager_msgs::msg::EStopList>(
        "~/e_stop_list" , reliable_transient_qos );
-  for ( const auto &aggregated_topic : params_.aggregated_topics ) {
-    auto normalized_name = aggregated_topic;
-    if ( !normalized_name.empty() && normalized_name.front() == '/' ) {
-      normalized_name.erase( normalized_name.begin() );
-    }
-    const auto full_topic = "~/aggregated_state/" + normalized_name ;
-    aggregated_publishers_[aggregated_topic] =
-        node_->create_publisher<std_msgs::msg::Bool>( full_topic, reliable_transient_qos );
-    e_stop_list_msg_.aggregated_names.push_back( aggregated_topic );
-  }
+  std::set<std::string> aggregated_topics;
 
   if ( params_.e_stop_names.empty() ) {
     RCLCPP_ERROR( node_->get_logger(),
@@ -49,32 +41,10 @@ EStopManager::EStopManager( const rclcpp::NodeOptions &options )
     }
 
     const auto &config = config_it->second;
+    aggregated_topics.insert( config.aggregated_topic );
     e_stop_state_[e_stop_name] = config.initial_value;
     e_stop_list_msg_.values.push_back( config.initial_value );
     aggregated_members_[config.aggregated_topic].push_back( e_stop_name );
-
-    const bool aggregated_topic_known =
-        std::find( params_.aggregated_topics.begin(), params_.aggregated_topics.end(),
-                   config.aggregated_topic ) != params_.aggregated_topics.end();
-    if ( !aggregated_topic_known ) {
-      RCLCPP_WARN( node_->get_logger(),
-                   "Aggregated topic '%s' for e-stop '%s' not listed in aggregated_topics.",
-                   config.aggregated_topic.c_str(), e_stop_name.c_str() );
-      if ( aggregated_publishers_.count( config.aggregated_topic ) == 0 ) {
-        auto normalized_name = config.aggregated_topic;
-        if ( !normalized_name.empty() && normalized_name.front() == '/' ) {
-          normalized_name.erase( normalized_name.begin() );
-        }
-        const auto full_topic = "~/aggregated_state/" + normalized_name ;
-        aggregated_publishers_[config.aggregated_topic] =
-            node_->create_publisher<std_msgs::msg::Bool>( full_topic, reliable_transient_qos );
-      }
-      if ( std::find( e_stop_list_msg_.aggregated_names.begin(),
-                      e_stop_list_msg_.aggregated_names.end(),
-                      config.aggregated_topic ) == e_stop_list_msg_.aggregated_names.end() ) {
-        e_stop_list_msg_.aggregated_names.push_back( config.aggregated_topic );
-      }
-    }
 
     if ( config.tracked_topic ) {
       tracked_subscriptions_[e_stop_name] = node_->create_subscription<std_msgs::msg::Bool>(
@@ -86,6 +56,17 @@ EStopManager::EStopManager( const rclcpp::NodeOptions &options )
       managed_publishers_[e_stop_name] = node_->create_publisher<std_msgs::msg::Bool>(
           "~/" + e_stop_name, reliable_transient_qos );
     }
+  }
+
+  for ( const auto &aggregated_topic : aggregated_topics ) {
+    auto normalized_name = aggregated_topic;
+    if ( !normalized_name.empty() && normalized_name.front() == '/' ) {
+      normalized_name.erase( normalized_name.begin() );
+    }
+    const auto full_topic = "~/aggregated_state/" + normalized_name;
+    aggregated_publishers_[aggregated_topic] =
+        node_->create_publisher<std_msgs::msg::Bool>( full_topic, reliable_transient_qos );
+    e_stop_list_msg_.aggregated_names.push_back( aggregated_topic );
   }
 
   set_e_stop_service_ = node_->create_service<e_stop_manager_msgs::srv::SetEStop>(
