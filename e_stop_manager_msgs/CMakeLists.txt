@@ -4,21 +4,17 @@ project(e_stop_manager_msgs)
 find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
-###########
-## Build ##
-###########
+# ##############################################################################
+# Build ##
+# ##############################################################################
 
-rosidl_generate_interfaces(${PROJECT_NAME}
-        "msg/EStopList.msg"
-        "srv/SetEStop.srv"
-        )
+rosidl_generate_interfaces(${PROJECT_NAME} "msg/EStopList.msg"
+                           "srv/SetEStop.srv")
 
-#############
-## Install ##
-#############
+# ##############################################################################
+# Install ##
+# ##############################################################################
 
-install(DIRECTORY "msg" "srv"
-        DESTINATION "share/${PROJECT_NAME}"
-        )
+install(DIRECTORY "msg" "srv" DESTINATION "share/${PROJECT_NAME}")
 
 ament_package()

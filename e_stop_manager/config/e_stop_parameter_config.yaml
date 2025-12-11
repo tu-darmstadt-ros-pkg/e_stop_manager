@@ -1,0 +1,27 @@
+e_stop_manager_config:
+  e_stop_names:
+    type: string_array
+    read_only: true
+    validation:
+      unique<>: null
+
+  aggregated_topics:
+    type: string_array
+    read_only: true
+    validation:
+      unique<>: null
+    default_value: ["/soft_estop", "/hard_estop"]
+
+  e_stop_config:
+    __map_e_stop_names:
+      aggregated_topic:
+        type: string
+        default_value: "/soft_estop"
+        read_only: true
+      initial_value:
+        type: bool
+        default_value: false
+        read_only: true
+      tracked_topic:
+        type: bool
+        read_only: true
