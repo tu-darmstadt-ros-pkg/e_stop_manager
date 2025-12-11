@@ -1,6 +1,7 @@
 #include "e_stop_manager/e_stop_manager.h"
 
 #include <algorithm>
+#include <cctype>
 #include <functional>
 #include <set>
 
@@ -16,9 +17,24 @@ EStopManager::EStopManager( const rclcpp::NodeOptions &options )
   const auto reliable_transient_qos =
       rclcpp::QoS( rclcpp::KeepLast( 10 ) ).reliable().transient_local();
 
+  auto is_valid_name = []( const std::string &name ) {
+    return !name.empty() && std::all_of( name.begin(), name.end(), []( char c ) {
+      return std::isalnum( static_cast<unsigned char>( c ) ) || c == '_';
+    } );
+  };
+
+  for ( const auto &name : params_.e_stop_names ) {
+    if ( !is_valid_name( name ) ) {
+      RCLCPP_ERROR( node_->get_logger(),
+                    "Invalid e-stop name '%s'. Names must only contain alphanumeric characters and "
+                    "underscores. Node will shut down.",
+                    name.c_str() );
+      throw std::runtime_error( "Invalid e-stop name" );
+    }
+  }
 
   e_stop_list_pub_ = node_->create_publisher<e_stop_manager_msgs::msg::EStopList>(
-       "~/e_stop_list" , reliable_transient_qos );
+      "~/e_stop_list", reliable_transient_qos );
   std::set<std::string> aggregated_topics;
 
   if ( params_.e_stop_names.empty() ) {
@@ -41,10 +57,26 @@ EStopManager::EStopManager( const rclcpp::NodeOptions &options )
     }
 
     const auto &config = config_it->second;
-    aggregated_topics.insert( config.aggregated_topic );
+    bool sanitized_changed = false;
+    std::string sanitized_aggregated =
+        sanitizeTopicName( config.aggregated_topic, sanitized_changed );
+    if ( sanitized_aggregated.empty() ) {
+      RCLCPP_ERROR(
+          node_->get_logger(),
+          "Aggregated topic for e-stop '%s' is invalid after sanitization. Node will shut down.",
+          e_stop_name.c_str() );
+      throw std::runtime_error( "Invalid aggregated topic" );
+    }
+    if ( sanitized_changed ) {
+      RCLCPP_WARN( node_->get_logger(), "Aggregated topic '%s' for e-stop '%s' sanitized to '%s'.",
+                   config.aggregated_topic.c_str(), e_stop_name.c_str(),
+                   sanitized_aggregated.c_str() );
+    }
+
+    aggregated_topics.insert( sanitized_aggregated );
     e_stop_state_[e_stop_name] = config.initial_value;
     e_stop_list_msg_.values.push_back( config.initial_value );
-    aggregated_members_[config.aggregated_topic].push_back( e_stop_name );
+    aggregated_members_[sanitized_aggregated].push_back( e_stop_name );
 
     if ( config.tracked_topic ) {
       tracked_subscriptions_[e_stop_name] = node_->create_subscription<std_msgs::msg::Bool>(
@@ -53,17 +85,13 @@ EStopManager::EStopManager( const rclcpp::NodeOptions &options )
             this->handleTrackedUpdate( e_stop_name, msg->data );
           } );
     } else {
-      managed_publishers_[e_stop_name] = node_->create_publisher<std_msgs::msg::Bool>(
-          "~/" + e_stop_name, reliable_transient_qos );
+      managed_publishers_[e_stop_name] =
+          node_->create_publisher<std_msgs::msg::Bool>( "~/" + e_stop_name, reliable_transient_qos );
     }
   }
 
   for ( const auto &aggregated_topic : aggregated_topics ) {
-    auto normalized_name = aggregated_topic;
-    if ( !normalized_name.empty() && normalized_name.front() == '/' ) {
-      normalized_name.erase( normalized_name.begin() );
-    }
-    const auto full_topic = "~/aggregated_state/" + normalized_name;
+    const auto full_topic = "~/aggregated_state/" + aggregated_topic;
     aggregated_publishers_[aggregated_topic] =
         node_->create_publisher<std_msgs::msg::Bool>( full_topic, reliable_transient_qos );
     e_stop_list_msg_.aggregated_names.push_back( aggregated_topic );
@@ -135,6 +163,30 @@ bool EStopManager::setEStopServiceCB(
   return true;
 }
 
+std::string EStopManager::sanitizeTopicName( const std::string &name, bool &changed )
+{
+  changed = false;
+  std::string sanitized;
+  sanitized.reserve( name.size() );
+  for ( char c : name ) {
+    if ( c == '/' ) {
+      sanitized.push_back( c );
+      continue;
+    }
+    if ( c == '-' ) {
+      sanitized.push_back( '_' );
+      changed = true;
+      continue;
+    }
+    if ( std::isalnum( static_cast<unsigned char>( c ) ) || c == '_' ) {
+      sanitized.push_back( c );
+    } else {
+      sanitized.push_back( '_' );
+      changed = true;
+    }
+  }
+  return sanitized;
+}
 void EStopManager::publishEStops()
 {
   // Update individual e-stop values in list

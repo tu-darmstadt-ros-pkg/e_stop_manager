@@ -50,6 +50,7 @@ The message contains:
 * `aggregated_names[]` — names of all aggregated groups
 * `aggregated_values[]` — current aggregated states
 * All publishers and subscribers (tracked, managed, aggregated, list) use reliable + transient local QoS for latched, reliable delivery.
+* Aggregated topic names are sanitized to valid ROS topic fragments (slashes removed, `-` becomes `_`). Invalid e-stop source names are rejected at startup.
 
 ---
 

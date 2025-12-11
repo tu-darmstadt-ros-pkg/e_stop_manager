@@ -24,6 +24,7 @@ public:
   }
 
 private:
+  static std::string sanitizeTopicName( const std::string &name, bool& changed );
   void publishEStops();
 
   void handleTrackedUpdate( const std::string &name, bool value );

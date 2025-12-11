@@ -20,8 +20,8 @@ struct EStopConfigEntry {
   bool tracked;
 };
 
-const std::vector<std::string> AGGREGATED_NAMES = { "/emergency_stop_hardware",
-                                                    "/emergency_stop_software" };
+const std::vector<std::string> AGGREGATED_NAMES = { "emergency_stop_hardware",
+                                                    "emergency_stop_software" };
 
 const std::map<std::string, EStopConfigEntry> E_STOP_CONFIG = {
     { "hard_remote_e_stop", { "/emergency_stop_hardware", true } },
@@ -222,7 +222,12 @@ public:
   bool expectedAggregatedState( const std::string &topic ) const
   {
     for ( const auto &entry : E_STOP_CONFIG ) {
-      if ( entry.second.aggregated_topic == topic && e_stop_state_.at( entry.first ) ) {
+      auto normalized = entry.second.aggregated_topic;
+      if ( !normalized.empty() && normalized.front() == '/' ) {
+        normalized.erase( normalized.begin() );
+      }
+      std::replace( normalized.begin(), normalized.end(), '-', '_' );
+      if ( normalized == topic && e_stop_state_.at( entry.first ) ) {
         return true;
       }
     }

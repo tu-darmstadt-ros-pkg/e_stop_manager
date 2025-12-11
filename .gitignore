@@ -7,3 +7,5 @@ cmake-build-*/
 doc/
 
 *.qmlc
+
+*__pycache__/
