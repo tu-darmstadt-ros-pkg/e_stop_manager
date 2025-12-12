@@ -7,21 +7,17 @@ It supports two types of E-stop sources:
 
 * The manager **subscribes** to a topic published by the source.
 * The E-stop state is fully determined by the incoming `std_msgs/Bool` message.
-* Topic name:
+* Topic name: ```  ~/<e_stop_name>  ``` (can be remapped in the launch file).
 
-  ```
-  ~/<e_stop_name>
-  ```
+ 
 
 ### **2. Managed E-Stop Sources**
 
 * These do **not** publish a topic themselves.
-* The manager **hosts** the topic (publishes the current value).
-* External components can update the state via the service:
+* The manager **hosts** the topic (publishes the current value) on ```~/<e_stop_name> ```.
+* External components can update the state via the service: ```/e_stop_manager/set_e_stop ```
 
-  ```
-  /e_stop_manager/set_e_stop
-  ```
+  
 
 Both types of sources are combined into aggregated E-stop groups (e.g. *hardware*, *software*) and into a single combined E-stop list message.
 
@@ -36,6 +32,11 @@ Each aggregated group is published as a `std_msgs/Bool`:
 ```
 <node_name>/aggregated_state/<aggregated_e_stop_name>    # e.g. /e_stop_manager/aggregated_state/emergency_stop_hardware
 ```
+
+Notes:
+
+- `aggregated_topic` in the config is a logical group name, not a full topic. Any `/` are stripped, `-` becomes `_`, and other invalid characters become `_`.
+- A special aggregated state `overall` is always added and is `true` if any configured E-stop is active.
 
 ### **2. Complete E-Stop Status (all sources + all aggregates)**
 
@@ -80,7 +81,7 @@ Managed E-stop sources can be updated via:
 | Name                 | Value | Meaning             |
 | -------------------- | ----- | ------------------- |
 | `SUCCESS`            | 0     | Update accepted     |
-| `FAILURE`            | 1     | Update rejected     |
+| `FAILURE`            | 1     | Update rejected (e.g. tracked E-stop via service) |
 | `INVALID_ESTOP_NAME` | 2     | Unknown E-stop name |
 
 ---
@@ -118,22 +119,22 @@ e_stop_manager:
 
     e_stop_config:
       hard_remote_e_stop:
-        aggregated_topic: "/emergency_stop_hardware"
+        aggregated_topic: "emergency_stop_hardware"
         tracked_topic: true          # subscribes to ~/<name>
         initial_value: false
 
       soft_remote_e_stop:
-        aggregated_topic: "/emergency_stop_hardware"
+        aggregated_topic: "emergency_stop_hardware"
         tracked_topic: true
         initial_value: false
 
       big_red_button_e_stop:
-        aggregated_topic: "/emergency_stop_software"
+        aggregated_topic: "emergency_stop_software"
         tracked_topic: true
         initial_value: false
 
       ui_e_stop:
-        aggregated_topic: "/emergency_stop_software"
+        aggregated_topic: "emergency_stop_software"
         tracked_topic: false         # managed source
         initial_value: false
 ```
