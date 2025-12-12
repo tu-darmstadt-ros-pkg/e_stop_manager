@@ -9,7 +9,7 @@ It supports two types of E-stop sources:
 * The E-stop state is fully determined by the incoming `std_msgs/Bool` message.
 * Topic name: ```  ~/<e_stop_name>  ``` (can be remapped in the launch file).
 
- 
+
 
 ### **2. Managed E-Stop Sources**
 
@@ -17,7 +17,7 @@ It supports two types of E-stop sources:
 * The manager **hosts** the topic (publishes the current value) on ```~/<e_stop_name> ```.
 * External components can update the state via the service: ```/e_stop_manager/set_e_stop ```
 
-  
+
 
 Both types of sources are combined into aggregated E-stop groups (e.g. *hardware*, *software*) and into a single combined E-stop list message.
 

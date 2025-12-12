@@ -146,7 +146,8 @@ void EStopManager::setEStopServiceCB( const std::shared_ptr<e_stop_manager_msgs:
   }
 
   state_it->second = request->value;
-  RCLCPP_INFO( node_->get_logger(), "Managed e-stop '%s' set to %s via service.", request->name.c_str(), request->value? "activated":"deactivated" );
+  RCLCPP_INFO( node_->get_logger(), "Managed e-stop '%s' set to %s via service.", request->name.c_str(),
+               request->value ? "activated" : "deactivated" );
 
   publishEStops();
   response->result = response->SUCCESS;

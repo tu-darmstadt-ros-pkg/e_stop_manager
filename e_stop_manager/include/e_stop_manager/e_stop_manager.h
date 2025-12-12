@@ -18,13 +18,10 @@ public:
   explicit EStopManager( const rclcpp::NodeOptions &options = rclcpp::NodeOptions() );
 
   // required if not subclassing Node, see https://github.com/ros2/demos/blob/humble/composition/src/node_like_listener_component.cpp
-  rclcpp::node_interfaces::NodeBaseInterface::SharedPtr get_node_base_interface() const
-  {
-    return this->node_->get_node_base_interface();
-  }
+  rclcpp::node_interfaces::NodeBaseInterface::SharedPtr get_node_base_interface() const { return this->node_->get_node_base_interface(); }
 
 private:
-  static std::string sanitizeTopicName( const std::string &name, bool& changed );
+  static std::string sanitizeTopicName( const std::string &name, bool &changed );
   void publishEStops();
 
   void handleTrackedUpdate( const std::string &name, bool value );
