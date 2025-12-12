@@ -127,7 +127,7 @@ void EStopManager::setEStopServiceCB( const std::shared_ptr<e_stop_manager_msgs:
 
   if ( config_it == params_.e_stop_config.e_stop_names_map.end() || state_it == e_stop_state_.end() ) {
     RCLCPP_ERROR( node_->get_logger(), "E-stop '%s' not found.", request->name.c_str() );
-    response->result = response->INVALID_ESTOP_NAME;
+    response->result = e_stop_manager_msgs::srv::SetEStop_Response::INVALID_ESTOP_NAME;
     return;
   }
 
@@ -135,13 +135,13 @@ void EStopManager::setEStopServiceCB( const std::shared_ptr<e_stop_manager_msgs:
   if ( config.tracked_topic ) {
     RCLCPP_WARN( node_->get_logger(), "Service request rejected: e-stop '%s' is tracked and cannot be set via service.",
                  request->name.c_str() );
-    response->result = response->FAILURE;
+    response->result = e_stop_manager_msgs::srv::SetEStop_Response::FAILURE;
     return;
   }
 
   if ( state_it->second == request->value ) {
     RCLCPP_DEBUG( node_->get_logger(), "Requested state for managed e-stop '%s' unchanged.", request->name.c_str() );
-    response->result = response->SUCCESS;
+    response->result = e_stop_manager_msgs::srv::SetEStop_Response::SUCCESS;
     return;
   }
 
@@ -150,7 +150,7 @@ void EStopManager::setEStopServiceCB( const std::shared_ptr<e_stop_manager_msgs:
                request->value ? "activated" : "deactivated" );
 
   publishEStops();
-  response->result = response->SUCCESS;
+  response->result = e_stop_manager_msgs::srv::SetEStop_Response::SUCCESS;
 }
 
 std::string EStopManager::sanitizeTopicName( const std::string &name, bool &changed )
@@ -158,8 +158,8 @@ std::string EStopManager::sanitizeTopicName( const std::string &name, bool &chan
   changed = false;
   std::string sanitized;
   sanitized.reserve( name.size() );
-  for ( char c : name ) {
-    const unsigned char uc = static_cast<unsigned char>( c );
+  for ( const char c : name ) {
+    const auto uc = static_cast<unsigned char>( c );
     if ( c == '/' ) {
       changed = true;
       continue; // drop slashes entirely
@@ -193,10 +193,10 @@ void EStopManager::publishEStops()
   }
 
   // Publish managed e-stop topics hosted by this node
-  for ( const auto &managed : managed_publishers_ ) {
+  for ( const auto &[e_stop_name, pub] : managed_publishers_ ) {
     std_msgs::msg::Bool msg;
-    msg.data = e_stop_state_[managed.first];
-    managed.second->publish( msg );
+    msg.data = e_stop_state_[e_stop_name];
+    pub->publish( msg );
   }
 
   // Compute aggregated states and publish them

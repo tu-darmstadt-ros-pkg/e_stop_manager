@@ -26,7 +26,7 @@ private:
 
   void handleTrackedUpdate( const std::string &name, bool value );
 
-  void setEStopServiceCB( const std::shared_ptr<e_stop_manager_msgs::srv::SetEStop::Request> request,
+  void setEStopServiceCB( std::shared_ptr<e_stop_manager_msgs::srv::SetEStop::Request> request,
                           std::shared_ptr<e_stop_manager_msgs::srv::SetEStop::Response> response );
 
   rclcpp::Service<e_stop_manager_msgs::srv::SetEStop>::SharedPtr set_e_stop_service_;
