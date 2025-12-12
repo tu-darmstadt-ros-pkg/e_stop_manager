@@ -116,7 +116,7 @@ public:
       : node_( std::make_shared<rclcpp::Node>( "test_client", options ) ), e_stop_list_msgs_( node_, "/" + NODE_NAME + "/e_stop_list" ),
         managed_topic_msgs_( node_, "/" + NODE_NAME + "/" + MANAGED_ESTOP )
   {
-    client_ = node_->create_client<e_stop_manager_msgs::srv::SetEStop>( "/"+ NODE_NAME + "/set_e_stop" );
+    client_ = node_->create_client<e_stop_manager_msgs::srv::SetEStop>( "/" + NODE_NAME + "/set_e_stop" );
 
     for ( const auto &aggregated_name : AGGREGATED_NAMES ) {
       aggregated_msgs_.emplace( aggregated_name,

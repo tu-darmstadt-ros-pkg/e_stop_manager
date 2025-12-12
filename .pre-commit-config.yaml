@@ -59,8 +59,8 @@ repos:
   - repo: https://github.com/cheshirekow/cmake-format-precommit
     rev: v0.6.13
     hooks:
-      - id: cmake-format
-      - id: cmake-lint
+    - id: cmake-format
+    - id: cmake-lint
 
   # Package XML
   - repo: https://github.com/Joschi3/package_xml_validation.git
@@ -68,13 +68,6 @@ repos:
     hooks:
       - id: format-package-xml
         name: Validate and Format package.xml
-
-  # Yaml launch and config files
-  - repo: https://github.com/Joschi3/launch_config_validator.git
-    rev: v0.1.2
-    hooks:
-      - id: format-yaml-launch-and-configs
-        name: Validate ROS2 launch and config YAML files
 
   # Spellcheck
   - repo: https://github.com/crate-ci/typos
@@ -88,4 +81,8 @@ repos:
       - id: check-github-workflows
         args: ["--verbose"]
       - id: check-github-actions
+        args: ["--verbose"]
+      - id: check-gitlab-ci
+        args: ["--verbose"]
+      - id: check-compose-spec
         args: ["--verbose"]
