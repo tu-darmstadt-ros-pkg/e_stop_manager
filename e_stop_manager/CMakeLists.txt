@@ -70,6 +70,20 @@ target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME})
 ament_target_dependencies(${PROJECT_NAME}_node rclcpp)
 
 # ------------------------------------------------------------------------------
+# Testing
+# ------------------------------------------------------------------------------
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+  find_package(ros_testing REQUIRED)
+  ament_add_gtest_executable(${PROJECT_NAME}_test test/test_e_stop_manager.cpp)
+  target_link_libraries(${PROJECT_NAME}_test ${PROJECT_NAME})
+  ament_target_dependencies(${PROJECT_NAME}_test
+                            ${THIS_PACKAGE_INCLUDE_DEPENDS})
+  add_ros_test(test/test_e_stop_manager.launch.py ARGS
+               "test_binary_dir:=${CMAKE_CURRENT_BINARY_DIR}")
+endif()
+
+# ------------------------------------------------------------------------------
 # Install
 # ------------------------------------------------------------------------------
 install(

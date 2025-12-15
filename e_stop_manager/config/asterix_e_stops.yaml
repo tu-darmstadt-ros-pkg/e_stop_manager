@@ -13,7 +13,7 @@ e_stop_manager:
         tracked_topic: true
         initial_value: false
       big_red_button_e_stop:
-        aggregated_topic: "/emergency_stop_software"
+        aggregated_topic: "/emergency_stop_hardware"
         initial_value: false
         tracked_topic: true
       ui_e_stop:

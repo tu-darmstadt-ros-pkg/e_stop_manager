@@ -148,6 +148,10 @@ public:
         std::this_thread::sleep_for( 10ms );
       }
     }
+    // wait until all msg containers received a msg
+    for ( const auto &[name, container] : aggregated_msgs_ ) { ASSERT_TRUE( container->waitForMessage( 1s ) ); }
+    ASSERT_TRUE( e_stop_list_msgs_.waitForMessage( 1s ) );
+    ASSERT_TRUE( managed_topic_msgs_.waitForMessage( 1s ) );
   }
 
   void resetStartState()
@@ -346,12 +350,18 @@ TEST_F( EStopManagerTest, ServiceRejectsTrackedEStop )
 TEST_F( EStopManagerTest, InvalidEStopName )
 {
   test_client_->waitForConnection();
+  // sleep
   test_client_->resetStartState();
   test_client_->resetAllMsgContainers();
 
   test_client_->callInvalidName();
 
-  for ( const auto &topic : AGGREGATED_NAMES ) { EXPECT_FALSE( test_client_->aggregated_msgs_.at( topic )->waitForMessage( 200ms ) ); }
+  for ( const auto &topic : AGGREGATED_NAMES ) {
+    RCLCPP_INFO( test_client_->node_->get_logger(), "Checking topic %s for no message", topic.c_str() );
+    EXPECT_FALSE( test_client_->aggregated_msgs_.at( topic )->waitForMessage( 200ms ) );
+  }
+  RCLCPP_INFO( test_client_->node_->get_logger(), "Checking topic e_stop_list for no message" );
+
   EXPECT_FALSE( test_client_->e_stop_list_msgs_.waitForMessage( 200ms ) );
 }
 
