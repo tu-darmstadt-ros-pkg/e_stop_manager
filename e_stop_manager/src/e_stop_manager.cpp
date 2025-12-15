@@ -15,31 +15,10 @@ EStopManager::EStopManager( const rclcpp::NodeOptions &options ) : node_( std::m
 
   const auto reliable_transient_qos = rclcpp::QoS( rclcpp::KeepLast( 1 ) ).reliable().transient_local();
 
-  auto is_valid_name = []( const std::string &name ) {
-    return !name.empty() &&
-           std::all_of( name.begin(), name.end(), []( char c ) { return std::isalnum( static_cast<unsigned char>( c ) ) || c == '_'; } );
-  };
-
-  for ( const auto &name : params_.e_stop_names ) {
-    if ( !is_valid_name( name ) ) {
-      RCLCPP_ERROR( node_->get_logger(),
-                    "Invalid e-stop name '%s'. Names must only contain alphanumeric characters and "
-                    "underscores. Node will shut down.",
-                    name.c_str() );
-      throw std::runtime_error( "Invalid e-stop name" );
-    }
-  }
-
   e_stop_list_pub_ = node_->create_publisher<e_stop_manager_msgs::msg::EStopList>( "~/e_stop_list", reliable_transient_qos );
   std::set<std::string> aggregated_topics;
   const std::string overall_aggregated_topic = "overall";
   aggregated_topics.insert( overall_aggregated_topic );
-
-  if ( params_.e_stop_names.empty() ) {
-    RCLCPP_ERROR( node_->get_logger(), "No e_stop_names provided. At least one e-stop source must be configured. Node "
-                                       "will shut down." );
-    throw std::runtime_error( "No e-stop names configured" );
-  }
 
   e_stop_list_msg_.names = params_.e_stop_names;
 
@@ -54,29 +33,15 @@ EStopManager::EStopManager( const rclcpp::NodeOptions &options ) : node_( std::m
     }
 
     const auto &config = config_it->second;
-    bool sanitized_changed = false;
-    std::string sanitized_aggregated = sanitizeTopicName( config.aggregated_topic, sanitized_changed );
-    if ( sanitized_aggregated.empty() ) {
-      RCLCPP_ERROR( node_->get_logger(), "Aggregated topic for e-stop '%s' is invalid after sanitization. Node will shut down.",
-                    e_stop_name.c_str() );
-      throw std::runtime_error( "Invalid aggregated topic" );
-    }
-    if ( sanitized_changed ) {
-      RCLCPP_WARN( node_->get_logger(), "Aggregated topic '%s' for e-stop '%s' sanitized to '%s'.", config.aggregated_topic.c_str(),
-                   e_stop_name.c_str(), sanitized_aggregated.c_str() );
-    }
-    if ( sanitized_aggregated.empty() ) {
-      RCLCPP_ERROR( node_->get_logger(),
-                    "Aggregated topic for e-stop '%s' resolves to an empty name. Node will shut "
-                    "down.",
-                    e_stop_name.c_str() );
-      throw std::runtime_error( "Invalid aggregated topic after stripping disallowed characters" );
-    }
 
-    aggregated_topics.insert( sanitized_aggregated );
+    // sanitize aggregated topic name
+    // if starts with ~ or /, remove that character
+    std::string fixed_topic = sanitizeTopicName( config.aggregated_topic );
+
+    aggregated_topics.insert( fixed_topic );
     e_stop_state_[e_stop_name] = config.initial_value;
     e_stop_list_msg_.values.push_back( config.initial_value );
-    aggregated_members_[sanitized_aggregated].push_back( e_stop_name );
+    aggregated_members_[fixed_topic].push_back( e_stop_name );
     aggregated_members_[overall_aggregated_topic].push_back( e_stop_name );
 
     if ( config.tracked_topic ) {
@@ -153,33 +118,18 @@ void EStopManager::setEStopServiceCB( const std::shared_ptr<e_stop_manager_msgs:
   response->result = e_stop_manager_msgs::srv::SetEStop_Response::SUCCESS;
 }
 
-std::string EStopManager::sanitizeTopicName( const std::string &name, bool &changed )
+std::string EStopManager::sanitizeTopicName( const std::string &name )
 {
-  changed = false;
-  std::string sanitized;
-  sanitized.reserve( name.size() );
-  for ( const char c : name ) {
-    const auto uc = static_cast<unsigned char>( c );
-    if ( c == '/' ) {
-      changed = true;
-      continue; // drop slashes entirely
-    }
-    if ( c == '-' ) {
-      sanitized.push_back( '_' );
-      changed = true;
-      continue;
-    }
-    if ( std::isalnum( uc ) || c == '_' ) {
-      sanitized.push_back( c );
-      continue;
-    }
-    sanitized.push_back( '_' );
-    changed = true;
+  // due to the validator used the topic is already valid
+  // here we only remove leasing '~' or '/' if present, since we use the topic name as part of another topic
+  std::string sanitized_name = name;
+  if ( name.front() == '~' ) {
+    sanitized_name.erase( 0, 1 );
   }
-  if ( sanitized.empty() ) {
-    return {};
+  if ( sanitized_name.front() == '/' ) {
+    sanitized_name.erase( 0, 1 );
   }
-  return sanitized;
+  return sanitized_name;
 }
 void EStopManager::publishEStops()
 {

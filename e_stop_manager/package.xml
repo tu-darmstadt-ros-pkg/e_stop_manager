@@ -9,6 +9,7 @@
   <buildtool_depend>ament_cmake</buildtool_depend>
 
   <depend>e_stop_manager_msgs</depend>
+  <depend>generate_parameter_lib_validators</depend>
   <depend>generate_parameter_library</depend>
   <depend>parameter_traits</depend>
   <depend>rclcpp</depend>

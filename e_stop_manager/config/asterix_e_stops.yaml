@@ -5,11 +5,11 @@ e_stop_manager:
 
     e_stop_config:
       hard_remote_e_stop:
-        aggregated_topic: "/emergency-stop_hardware"
+        aggregated_topic: "/emergency_stop_hardware"
         tracked_topic: true
         initial_value: false
       soft_remote_e_stop:
-        aggregated_topic: "/emergency_stop_hardware"
+        aggregated_topic: "/emergency_stop_software"
         tracked_topic: true
         initial_value: false
       big_red_button_e_stop:
