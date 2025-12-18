@@ -1,0 +1,25 @@
+e_stop_manager_config:
+  e_stop_names:
+    type: string_array
+    read_only: true
+    validation:
+      unique<>: null
+      not_empty<>: null
+      "generate_parameter_lib_validators::valid_topic_name": null
+
+  e_stop_config:
+    __map_e_stop_names:
+      aggregated_topic:
+        type: string
+        default_value: "/soft_estop"
+        read_only: true
+        validation:
+          not_empty<>: null
+          "generate_parameter_lib_validators::valid_topic_name": null
+      initial_value:
+        type: bool
+        default_value: false
+        read_only: true
+      tracked_topic:
+        type: bool
+        read_only: true

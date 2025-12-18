@@ -1,27 +1,45 @@
+#include <algorithm>
 #include <chrono>
-#include <condition_variable>
-#include <e_stop_manager/e_stop_manager.h>
 #include <gtest/gtest.h>
+#include <map>
+#include <memory>
 #include <mutex>
 #include <rclcpp/rclcpp.hpp>
+#include <std_msgs/msg/bool.hpp>
+#include <string>
+#include <thread>
+#include <vector>
+
+#include <e_stop_manager_msgs/msg/e_stop_list.hpp>
+#include <e_stop_manager_msgs/srv/set_e_stop.hpp>
 
 using namespace std::chrono_literals;
 
-/**
- * Start the tests with
- * cd <ros2_workspace>
- * ros2 launch_test src/e_stop_manager/e_stop_manager/test/test_e_stop_manager.launch.py test_binary_dir:="build/e_stop_manager"
- *
- */
+struct EStopConfigEntry {
+  std::string aggregated_topic;
+  bool tracked;
+};
 
-// Redefinition of topics and e-stops
-// redefined here to test if e-stop manager is able to read the config params correctly and set up the correct publishers
-std::vector<std::string> E_STOP_TOPICS = { "/emergency_stop_hardware", "/emergency_stop_software" };
-std::map<std::string, std::string> E_STOP_NAMES_TO_TOPIC = {
-    { "hard_remote_e_stop", "/emergency_stop_hardware" },
-    { "soft_remote_e_stop", "/emergency_stop_hardware" },
-    { "big_red_button_e_stop", "/emergency_stop_software" },
-    { "ui_e_stop", "/emergency_stop_software" } };
+const std::vector<std::string> AGGREGATED_NAMES = { "emergency_stop_hardware", "emergency_stop_software" };
+
+const std::map<std::string, EStopConfigEntry> E_STOP_CONFIG = {
+    { "hard_remote_e_stop", { "/emergency_stop_hardware", true } },
+    { "soft_remote_e_stop", { "/emergency_stop_hardware", true } },
+    { "big_red_button_e_stop", { "/emergency_stop_software", true } },
+    { "ui_e_stop", { "/emergency_stop_software", false } },
+};
+
+const std::string MANAGED_ESTOP = "ui_e_stop";
+const std::string NODE_NAME = "e_stop_manager";
+
+std::string aggregatedTopicName( const std::string &aggregated_name )
+{
+  auto normalized = aggregated_name;
+  if ( !normalized.empty() && normalized.front() == '/' ) {
+    normalized.erase( normalized.begin() );
+  }
+  return "/" + NODE_NAME + "/aggregated_state/" + normalized;
+}
 
 template<typename MsgType>
 struct MsgContainer {
@@ -30,9 +48,9 @@ struct MsgContainer {
   MsgContainer( const rclcpp::Node::SharedPtr &node, const std::string &topic_name )
       : msg_received_( false ), topic_name_( topic_name ), msg_{ nullptr }
   {
-
     auto callback = [this]( const typename MsgType::SharedPtr msg ) { this->storeMessage( msg ); };
-    subscriber_ = node->create_subscription<MsgType>( topic_name_, 10, callback );
+    subscriber_ =
+        node->create_subscription<MsgType>( topic_name_, rclcpp::QoS( rclcpp::KeepLast( 10 ) ).reliable().transient_local(), callback );
   }
 
   void storeMessage( const MessageSharedPtr &msg )
@@ -54,53 +72,33 @@ struct MsgContainer {
     msg_received_ = false;
   }
 
-  // Wait for a message to be received with a specific timeout duration
-  bool waitForMessage( std::chrono::milliseconds timeout = std::chrono::milliseconds( 200 ),
-                       double frequency = 10 )
+  bool waitForMessage( std::chrono::milliseconds timeout = std::chrono::milliseconds( 300 ), double frequency = 10 )
   {
     rclcpp::Rate rate( frequency );
     auto start_time = std::chrono::steady_clock::now();
     while ( !msg_received_ ) {
       if ( std::chrono::steady_clock::now() - start_time > timeout ) {
-        return false; // Timeout reached
+        return false;
       }
       rate.sleep();
     }
-    return true; // Message received within the timeout
+    return true;
   }
 
-  // Method to check if at least one publisher is subscribed to the subscriber
-  bool isSubscriberConnected() const
-  {
-    if ( subscriber_ ) {
-      auto num_publishers = subscriber_->get_publisher_count();
-      return ( num_publishers > 0 );
-    }
-    return false;
-  }
-
-  // Wait for a publisher to be connected with a specific frequency and timeout
-  bool waitForPublisher( std::chrono::milliseconds timeout = std::chrono::milliseconds( 200 ),
-                         double frequency = 10.0 )
+  bool waitForPublisher( std::chrono::milliseconds timeout = std::chrono::milliseconds( 300 ), double frequency = 10.0 )
   {
     rclcpp::Rate rate( frequency );
     auto start_time = std::chrono::steady_clock::now();
     while ( rclcpp::ok() ) {
       if ( subscriber_ && subscriber_->get_publisher_count() > 0 ) {
-        return true; // Publisher connected
+        return true;
       }
       if ( std::chrono::steady_clock::now() - start_time > timeout ) {
-        return false; // Timeout reached
+        return false;
       }
       rate.sleep();
     }
-    return false; // Unexpected failure or interruption
-  }
-
-  bool receivedMsgSinceLastReset() const
-  {
-    std::lock_guard<std::mutex> lock( mutex_ );
-    return msg_received_;
+    return false;
   }
 
 private:
@@ -111,174 +109,188 @@ private:
   typename rclcpp::Subscription<MsgType>::SharedPtr subscriber_;
 };
 
-// Mock client class for the service
 class TestClient
 {
 public:
   explicit TestClient( const rclcpp::NodeOptions &options = rclcpp::NodeOptions() )
-      : node_( std::make_shared<rclcpp::Node>( "test_client", options ) ),
-        e_stop_list_msgs(
-            MsgContainer<e_stop_manager_msgs::msg::EStopList>{ node_, "e_stop_list" } )
+      : node_( std::make_shared<rclcpp::Node>( "test_client", options ) ), e_stop_list_msgs_( node_, "/" + NODE_NAME + "/e_stop_list" ),
+        managed_topic_msgs_( node_, "/" + NODE_NAME + "/" + MANAGED_ESTOP )
   {
+    client_ = node_->create_client<e_stop_manager_msgs::srv::SetEStop>( "/" + NODE_NAME + "/set_e_stop" );
 
-    client_ = node_->create_client<e_stop_manager_msgs::srv::SetEStop>( "set_e_stop" );
-    for ( auto const &topic : E_STOP_TOPICS ) {
-      auto sub = std::make_shared<MsgContainer<std_msgs::msg::Bool>>( node_, topic );
-      e_stop_msgs.emplace( topic, sub );
+    for ( const auto &aggregated_name : AGGREGATED_NAMES ) {
+      aggregated_msgs_.emplace( aggregated_name,
+                                std::make_shared<MsgContainer<std_msgs::msg::Bool>>( node_, aggregatedTopicName( aggregated_name ) ) );
     }
 
-    // initialize all e_stops as off (must be the same in e_stop_manager config)
-    for ( const auto &pair : E_STOP_NAMES_TO_TOPIC ) { e_stop_state_[pair.first] = false; }
-  };
-
-  /*
-   * reset Start State -> all of them should be off
-   */
-  void resetStartStateOfEStopManager()
-  {
-    waitForConnection();
-    // turn all off
-    for ( const auto &pair : E_STOP_NAMES_TO_TOPIC ) { callEStop( pair.first, false ); }
-  }
-
-  bool getExpectedEStopTopicState( const std::string &topic )
-  {
-    // RCLCPP_INFO_STREAM(rclcpp::get_logger("test_client"),"getExpectedEStopTopicState "<<topic);
-    assert( std::find( E_STOP_TOPICS.begin(), E_STOP_TOPICS.end(), topic ) != E_STOP_TOPICS.end() );
-    bool state = false;
-    for ( const auto &pair : E_STOP_NAMES_TO_TOPIC ) {
-      if ( topic == pair.second && e_stop_state_[pair.first] ) {
-        state = true;
-        break;
+    for ( const auto &entry : E_STOP_CONFIG ) {
+      e_stop_state_[entry.first] = false;
+      if ( entry.second.tracked ) {
+        tracked_publishers_[entry.first] = node_->create_publisher<std_msgs::msg::Bool>(
+            "/" + NODE_NAME + "/" + entry.first, rclcpp::QoS( rclcpp::KeepLast( 10 ) ).reliable().transient_local() );
       }
     }
-    return state;
   }
 
-  rclcpp::node_interfaces::NodeBaseInterface::SharedPtr get_node_base_interface() const
-  {
-    return this->node_->get_node_base_interface();
-  }
+  rclcpp::node_interfaces::NodeBaseInterface::SharedPtr get_node_base_interface() const { return this->node_->get_node_base_interface(); }
 
-  /**
-   * Waits for the publishers and service clients of the test node to connect to the e-stop manager
-   * -> also asserts the existence of the publishers in the e-stop-manager
-   * @param test_client
-   */
   void waitForConnection()
   {
-    for ( const auto &pair : e_stop_msgs ) {
-      ASSERT_TRUE( pair.second->waitForPublisher( 300ms ) );
+    for ( const auto &pair : aggregated_msgs_ ) { ASSERT_TRUE( pair.second->waitForPublisher( 1s ) ); }
+    ASSERT_TRUE( e_stop_list_msgs_.waitForPublisher( 1s ) );
+    ASSERT_TRUE( managed_topic_msgs_.waitForPublisher( 1s ) );
+    ASSERT_TRUE( client_->wait_for_service( 1s ) );
+
+    for ( const auto &pub : tracked_publishers_ ) {
+      auto start_time = std::chrono::steady_clock::now();
+      while ( pub.second->get_subscription_count() == 0 ) {
+        ASSERT_LT( std::chrono::steady_clock::now() - start_time, 1s );
+        std::this_thread::sleep_for( 10ms );
+      }
     }
-    ASSERT_TRUE( client_->wait_for_service( 300ms ) );
+    // wait until all msg containers received a msg
+    for ( const auto &[name, container] : aggregated_msgs_ ) { ASSERT_TRUE( container->waitForMessage( 1s ) ); }
+    ASSERT_TRUE( e_stop_list_msgs_.waitForMessage( 1s ) );
+    ASSERT_TRUE( managed_topic_msgs_.waitForMessage( 1s ) );
   }
 
-  /**
-   * Reset all msg containers
-   */
+  void resetStartState()
+  {
+    for ( auto &state : e_stop_state_ ) { state.second = false; }
+    for ( const auto &pub : tracked_publishers_ ) { publishTracked( pub.first, false ); }
+    callManagedEStop( false );
+  }
+
   void resetAllMsgContainers()
   {
-    for ( const auto &pair : e_stop_msgs ) { pair.second->reset(); }
-    e_stop_list_msgs.reset();
+    for ( const auto &pair : aggregated_msgs_ ) { pair.second->reset(); }
+    managed_topic_msgs_.reset();
+    e_stop_list_msgs_.reset();
   }
 
-  /**
-   * Calls the e_stop service with the given values.
-   * @param e_stop_name
-   * @param requested_state
-   */
-  void callEStop( const std::string &e_stop_name, bool requested_state,
-                  bool invalid_e_stop_name = false )
+  void publishTracked( const std::string &name, bool value )
+  {
+    ASSERT_TRUE( tracked_publishers_.count( name ) > 0 );
+    std_msgs::msg::Bool msg;
+    msg.data = value;
+    tracked_publishers_[name]->publish( msg );
+    e_stop_state_[name] = value;
+  }
+
+  void callManagedEStop( bool requested_state )
   {
     auto request = std::make_shared<e_stop_manager_msgs::srv::SetEStop::Request>();
-    request->name = e_stop_name;
+    request->name = MANAGED_ESTOP;
     request->value = requested_state;
     auto result = client_->async_send_request( request );
-    // Wait for the result.
-    auto status = result.wait_for( 100ms );
-    EXPECT_TRUE( status == std::future_status::ready );
-    if ( !invalid_e_stop_name ) {
-      EXPECT_TRUE( result.get()->result == e_stop_manager_msgs::srv::SetEStop::Response::SUCCESS );
-    } else {
-      EXPECT_TRUE( result.get()->result ==
-                   e_stop_manager_msgs::srv::SetEStop::Response::INVALID_ESTOP_NAME );
-    }
-
-    e_stop_state_[e_stop_name] = requested_state;
+    ASSERT_EQ( result.wait_for( 200ms ), std::future_status::ready );
+    auto response = result.get();
+    EXPECT_EQ( response->result, e_stop_manager_msgs::srv::SetEStop::Response::SUCCESS );
+    e_stop_state_[MANAGED_ESTOP] = requested_state;
   }
 
-  /**
-   * Waits for msg on every e_stop + e_stop_list topic and compares the received state
-   * with the expected e_stop_topic state.
-   * Assumes: that resetAllMsgContainers has been called before the e-stop request to the e-stop-manager
-   */
-  void waitForMsgAndVerifyState()
+  void callTrackedExpectFailure( const std::string &name, bool requested_state )
   {
-    // Check e_stop_topics
-    for ( const auto &topic : E_STOP_TOPICS ) {
-      EXPECT_TRUE( e_stop_msgs[topic]->waitForMessage() );
-      auto msg = e_stop_msgs[topic]->getCurrentMessage();
-      if ( msg ) {
-        auto received_msg = e_stop_msgs[topic]->receivedMsgSinceLastReset();
-        RCLCPP_INFO_STREAM(
-            rclcpp::get_logger( "test_client" ),
-            "\t topic " << topic << " received " << ( received_msg ? "a" : "no" ) << " msg"
-                        << ( received_msg ? "with value " + std::to_string( msg->data ) : "" )
-                        << " expected topic state is: " << getExpectedEStopTopicState( topic ) );
-        // compare expected state with real state
-        EXPECT_EQ( getExpectedEStopTopicState( topic ), msg->data );
+    auto request = std::make_shared<e_stop_manager_msgs::srv::SetEStop::Request>();
+    request->name = name;
+    request->value = requested_state;
+    auto result = client_->async_send_request( request );
+    ASSERT_EQ( result.wait_for( 200ms ), std::future_status::ready );
+    auto response = result.get();
+    EXPECT_EQ( response->result, e_stop_manager_msgs::srv::SetEStop::Response::FAILURE );
+  }
+
+  void callInvalidName()
+  {
+    auto request = std::make_shared<e_stop_manager_msgs::srv::SetEStop::Request>();
+    request->name = "does_not_exist";
+    request->value = true;
+    auto result = client_->async_send_request( request );
+    ASSERT_EQ( result.wait_for( 200ms ), std::future_status::ready );
+    auto response = result.get();
+    EXPECT_EQ( response->result, e_stop_manager_msgs::srv::SetEStop::Response::INVALID_ESTOP_NAME );
+  }
+
+  bool expectedAggregatedState( const std::string &topic ) const
+  {
+    for ( const auto &entry : E_STOP_CONFIG ) {
+      auto normalized = entry.second.aggregated_topic;
+      if ( !normalized.empty() && normalized.front() == '/' ) {
+        normalized.erase( normalized.begin() );
+      }
+      std::replace( normalized.begin(), normalized.end(), '-', '_' );
+      if ( normalized == topic && e_stop_state_.at( entry.first ) ) {
+        return true;
       }
     }
+    return false;
+  }
 
-    // Check e_stop_list topic
-    EXPECT_TRUE( e_stop_list_msgs.waitForMessage() );
-    auto msg = e_stop_list_msgs.getCurrentMessage();
-    if ( msg ) {
-      ASSERT_EQ( msg->values.size(), msg->names.size() );
-      ASSERT_EQ( msg->values.size(), E_STOP_NAMES_TO_TOPIC.size() );
-      for ( size_t i = 0; i < msg->values.size(); i++ ) {
-        RCLCPP_INFO_STREAM( rclcpp::get_logger( "test_client" ),
-                            "\t topic "
-                                << msg->names[i] << " value " << msg->values[i]
-                                << " expected topic state is: " << e_stop_state_[msg->names[i]] );
-        EXPECT_EQ( msg->values[i], e_stop_state_[msg->names[i]] );
+  void waitForMsgAndVerifyState( bool expect_managed_topic )
+  {
+    for ( const auto &topic : AGGREGATED_NAMES ) {
+      EXPECT_TRUE( aggregated_msgs_.at( topic )->waitForMessage() );
+      auto msg = aggregated_msgs_.at( topic )->getCurrentMessage();
+      ASSERT_TRUE( msg );
+      EXPECT_EQ( expectedAggregatedState( topic ), msg->data );
+    }
+
+    if ( expect_managed_topic ) {
+      EXPECT_TRUE( managed_topic_msgs_.waitForMessage() );
+      auto msg = managed_topic_msgs_.getCurrentMessage();
+      ASSERT_TRUE( msg );
+      EXPECT_EQ( e_stop_state_[MANAGED_ESTOP], msg->data );
+    }
+
+    EXPECT_TRUE( e_stop_list_msgs_.waitForMessage() );
+    auto list_msg = e_stop_list_msgs_.getCurrentMessage();
+    ASSERT_TRUE( list_msg );
+
+    ASSERT_EQ( list_msg->names.size(), list_msg->values.size() );
+    ASSERT_EQ( list_msg->names.size(), E_STOP_CONFIG.size() );
+    for ( size_t i = 0; i < list_msg->names.size(); ++i ) {
+      const auto &name = list_msg->names[i];
+      ASSERT_TRUE( E_STOP_CONFIG.count( name ) > 0 );
+      EXPECT_EQ( list_msg->values[i], e_stop_state_[name] );
+    }
+
+    ASSERT_EQ( list_msg->aggregated_names.size(), list_msg->aggregated_values.size() );
+    for ( size_t i = 0; i < list_msg->aggregated_names.size(); ++i ) {
+      const auto &aggregated_name = list_msg->aggregated_names[i];
+      if ( std::find( AGGREGATED_NAMES.begin(), AGGREGATED_NAMES.end(), aggregated_name ) == AGGREGATED_NAMES.end() ) {
+        continue;
       }
+      EXPECT_EQ( list_msg->aggregated_values[i], expectedAggregatedState( aggregated_name ) );
     }
   }
 
   rclcpp::Node::SharedPtr node_;
   rclcpp::Client<e_stop_manager_msgs::srv::SetEStop>::SharedPtr client_;
-  std::map<std::string, std::shared_ptr<MsgContainer<std_msgs::msg::Bool>>> e_stop_msgs;
-  MsgContainer<e_stop_manager_msgs::msg::EStopList> e_stop_list_msgs;
+  std::map<std::string, std::shared_ptr<MsgContainer<std_msgs::msg::Bool>>> aggregated_msgs_;
+  MsgContainer<std_msgs::msg::Bool> managed_topic_msgs_;
+  MsgContainer<e_stop_manager_msgs::msg::EStopList> e_stop_list_msgs_;
+  std::map<std::string, rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr> tracked_publishers_;
   std::map<std::string, bool> e_stop_state_;
 };
 
-// Fixture class for testing EStopManager
 class EStopManagerTest : public ::testing::Test
 {
 protected:
-  EStopManagerTest()
-      : executor_( std::make_shared<rclcpp::executors::SingleThreadedExecutor>() ) { }
-
   void SetUp() override
   {
     test_client_ = std::make_shared<TestClient>();
     executor_ = std::make_shared<rclcpp::executors::SingleThreadedExecutor>();
     executor_->add_node( test_client_->get_node_base_interface() );
     executor_thread_ = std::thread( [this]() { this->executor_->spin(); } );
-    RCLCPP_INFO( rclcpp::get_logger( "test_client" ),
-                 "\n ************************ NEW TEST ****************** \n" );
   }
 
   void TearDown() override
   {
-    // Clean up resources if needed
     test_client_.reset();
     executor_->cancel();
     std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
     if ( executor_thread_.joinable() ) {
       executor_thread_.join();
-      RCLCPP_INFO( rclcpp::get_logger( "test_client" ), "Stopping executor thread!" );
     }
     executor_.reset();
   }
@@ -288,106 +300,69 @@ protected:
   std::thread executor_thread_;
 };
 
-/**
- * Tests if the TestClient is correctly connected to the e_stop_manager
- */
 TEST_F( EStopManagerTest, TestConnection ) { test_client_->waitForConnection(); }
 
-/**
- * Client request via the service client that an e_stop is on
- * -> the corresponding e_stop topic must receive a msg with the correct value
- * -> e_stop_list must be published
- * -> test starts with all e_stops off and iterativley turns every e_stop on then off again
- */
-TEST_F( EStopManagerTest, ServiceRequestChangesTopics )
+TEST_F( EStopManagerTest, TrackedSourcesUpdateAggregates )
 {
-  test_client_->resetStartStateOfEStopManager();
-  // iterate all available e-stops
-  for ( const auto &pair : E_STOP_NAMES_TO_TOPIC ) {
-    test_client_->resetAllMsgContainers();
-    // request 1 e-stop to be active
-    test_client_->callEStop( pair.first, true );
-    test_client_->waitForMsgAndVerifyState();
+  test_client_->waitForConnection();
+  test_client_->resetStartState();
 
-    // turn Off
-    test_client_->resetAllMsgContainers();
-    // request 1 e-stop to be active
-    test_client_->callEStop( pair.first, false );
-    test_client_->waitForMsgAndVerifyState();
-  }
-}
-
-/**
- *  Client request via the service client that an e_stop is off, but is already off
- *  -> should stay that way
- */
-TEST_F( EStopManagerTest, ServiceRequesteStopAlreadyOff )
-{
-  test_client_->resetStartStateOfEStopManager();
-  // iterate all available e-stops
-  for ( const auto &pair : E_STOP_NAMES_TO_TOPIC ) {
-    test_client_->resetAllMsgContainers();
-    test_client_->callEStop( pair.first, false );
-    EXPECT_FALSE( test_client_->e_stop_list_msgs.waitForMessage( 300ms ) );
-    for ( const auto &topic : E_STOP_TOPICS ) {
-      EXPECT_FALSE( test_client_->e_stop_msgs[topic]->waitForMessage(
-          1ms ) ); // already waited long enough above
+  for ( const auto &entry : E_STOP_CONFIG ) {
+    if ( !entry.second.tracked ) {
+      continue;
     }
+    test_client_->resetAllMsgContainers();
+    test_client_->publishTracked( entry.first, true );
+    test_client_->waitForMsgAndVerifyState( false );
+
+    test_client_->resetAllMsgContainers();
+    test_client_->publishTracked( entry.first, false );
+    test_client_->waitForMsgAndVerifyState( false );
   }
 }
 
-/**
- *  Client request via the service client that an e_stop is on, but is already on
- *  -> should stay that way
- */
-TEST_F( EStopManagerTest, ServiceRequesteStopAlreadyOn )
+TEST_F( EStopManagerTest, ManagedServiceUpdatesState )
 {
-  test_client_->resetStartStateOfEStopManager();
-  // Turn all on
-  for ( const auto &pair : E_STOP_NAMES_TO_TOPIC ) {
-    test_client_->resetAllMsgContainers();
-    // request 1 e-stop to be active
-    test_client_->callEStop( pair.first, true );
-    test_client_->waitForMsgAndVerifyState();
-  }
-  // turn on again -> should remain on
-  for ( const auto &pair : E_STOP_NAMES_TO_TOPIC ) {
-    test_client_->resetAllMsgContainers();
-    test_client_->callEStop( pair.first, true );
-
-    EXPECT_FALSE( test_client_->e_stop_list_msgs.waitForMessage( 300ms ) );
-    for ( const auto &topic : E_STOP_TOPICS ) {
-      EXPECT_FALSE( test_client_->e_stop_msgs[topic]->waitForMessage(
-          10ms ) ); // already waited long enough above
-    }
-  }
-}
-
-/**
- * Call service with non_exising e_stop name
- */
-TEST_F( EStopManagerTest, NonExistingEStopName )
-{
-  test_client_->resetStartStateOfEStopManager();
-
-  // turn 1 e_stop on
-  test_client_->resetAllMsgContainers();
-  test_client_->callEStop( E_STOP_NAMES_TO_TOPIC.begin()->first, true );
-  test_client_->waitForMsgAndVerifyState();
+  test_client_->waitForConnection();
+  test_client_->resetStartState();
 
   test_client_->resetAllMsgContainers();
-  // turn on non-exising e_stop
-  test_client_->callEStop( "DOES_NOT_EXIST", true, true );
-  // test that no msg arrives -> e_stop remains correct
-  EXPECT_FALSE( test_client_->e_stop_list_msgs.waitForMessage( 300ms ) );
-  for ( const auto &topic : E_STOP_TOPICS ) {
-    EXPECT_FALSE( test_client_->e_stop_msgs[topic]->waitForMessage(
-        10ms ) ); // already waited long enough above
-  }
+  test_client_->callManagedEStop( true );
+  test_client_->waitForMsgAndVerifyState( true );
 
-  // turn 1 e_stop off
-  test_client_->callEStop( E_STOP_NAMES_TO_TOPIC.begin()->first, false );
-  test_client_->waitForMsgAndVerifyState();
+  test_client_->resetAllMsgContainers();
+  test_client_->callManagedEStop( false );
+  test_client_->waitForMsgAndVerifyState( true );
+}
+
+TEST_F( EStopManagerTest, ServiceRejectsTrackedEStop )
+{
+  test_client_->waitForConnection();
+  test_client_->resetStartState();
+  test_client_->resetAllMsgContainers();
+
+  test_client_->callTrackedExpectFailure( "hard_remote_e_stop", true );
+
+  for ( const auto &topic : AGGREGATED_NAMES ) { EXPECT_FALSE( test_client_->aggregated_msgs_.at( topic )->waitForMessage( 200ms ) ); }
+  EXPECT_FALSE( test_client_->e_stop_list_msgs_.waitForMessage( 200ms ) );
+}
+
+TEST_F( EStopManagerTest, InvalidEStopName )
+{
+  test_client_->waitForConnection();
+  // sleep
+  test_client_->resetStartState();
+  test_client_->resetAllMsgContainers();
+
+  test_client_->callInvalidName();
+
+  for ( const auto &topic : AGGREGATED_NAMES ) {
+    RCLCPP_INFO( test_client_->node_->get_logger(), "Checking topic %s for no message", topic.c_str() );
+    EXPECT_FALSE( test_client_->aggregated_msgs_.at( topic )->waitForMessage( 200ms ) );
+  }
+  RCLCPP_INFO( test_client_->node_->get_logger(), "Checking topic e_stop_list for no message" );
+
+  EXPECT_FALSE( test_client_->e_stop_list_msgs_.waitForMessage( 200ms ) );
 }
 
 int main( int argc, char **argv )

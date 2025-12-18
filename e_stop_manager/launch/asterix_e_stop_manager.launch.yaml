@@ -1,0 +1,8 @@
+launch:
+  - node:
+      pkg: "e_stop_manager"
+      exec: "e_stop_manager_node"
+      name: "e_stop_manager"
+      output: "screen"
+      param:
+        - from: "$(find-pkg-share e_stop_manager)/config/asterix_e_stops.yaml"
