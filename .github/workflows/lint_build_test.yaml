@@ -57,6 +57,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: tu-darmstadt-ros-pkg/generate_parameter_lib_validators
+          ref: lyrical
           path: src/generate_parameter_lib_validators
       - uses: actions/checkout@v4
         with:

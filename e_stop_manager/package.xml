@@ -4,7 +4,7 @@
   <version>1.0.0</version>
   <description>The e_stop_manager package</description>
   <maintainer email="aljoscha.schmidt@tu-darmstadt.de">Aljoscha Schmidt</maintainer>
-  <license>TODO</license>
+  <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
