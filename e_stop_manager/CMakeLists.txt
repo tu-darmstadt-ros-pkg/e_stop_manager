@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.16)
 project(e_stop_manager VERSION 1.0.0)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -26,18 +26,20 @@ target_include_directories(
   ${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
                          $<INSTALL_INTERFACE:include>)
 
-target_link_libraries(${PROJECT_NAME} e_stop_manager_parameters)
+target_link_libraries(
+  ${PROJECT_NAME}
+  PUBLIC e_stop_manager_parameters rclcpp::rclcpp ${std_msgs_TARGETS}
+         ${e_stop_manager_msgs_TARGETS}
+  PRIVATE rclcpp_components::component)
 
-ament_target_dependencies(${PROJECT_NAME} rclcpp rclcpp_components std_msgs
-                          e_stop_manager_msgs)
+rclcpp_components_register_nodes(${PROJECT_NAME} "e_stop_manager::EStopManager")
 
 # ------------------------------------------------------------------------------
 # Node executable
 # ------------------------------------------------------------------------------
 add_executable(${PROJECT_NAME}_node src/e_stop_manager_node.cpp)
 
-target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME})
-ament_target_dependencies(${PROJECT_NAME}_node rclcpp)
+target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME} rclcpp::rclcpp)
 
 # ------------------------------------------------------------------------------
 # Testing
@@ -47,10 +49,8 @@ if(BUILD_TESTING)
   find_package(ros_testing REQUIRED)
   ament_add_gtest_executable(${PROJECT_NAME}_test test/test_e_stop_manager.cpp)
 
-  target_link_libraries(${PROJECT_NAME}_test ${PROJECT_NAME})
-
-  ament_target_dependencies(${PROJECT_NAME}_test rclcpp std_msgs
-                            e_stop_manager_msgs)
+  target_link_libraries(${PROJECT_NAME}_test ${PROJECT_NAME} rclcpp::rclcpp
+                        ${std_msgs_TARGETS} ${e_stop_manager_msgs_TARGETS})
 
   add_ros_test(test/test_e_stop_manager.launch.py ARGS
                "test_binary_dir:=${CMAKE_CURRENT_BINARY_DIR}")
@@ -60,8 +60,7 @@ endif()
 # Install
 # ------------------------------------------------------------------------------
 install(
-  TARGETS ${PROJECT_NAME} ${PROJECT_NAME}_node
-          e_stop_manager_parameters # <--- ADD THIS LINE
+  TARGETS ${PROJECT_NAME} ${PROJECT_NAME}_node e_stop_manager_parameters
   EXPORT export_${PROJECT_NAME}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
@@ -76,7 +75,8 @@ install(DIRECTORY include/ DESTINATION include)
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
 ament_export_include_directories(include)
 
-ament_export_dependencies(rclcpp rclcpp_components std_msgs e_stop_manager_msgs
-                          generate_parameter_lib_validators)
+ament_export_dependencies(
+  rclcpp rclcpp_components std_msgs e_stop_manager_msgs
+  generate_parameter_library generate_parameter_lib_validators)
 
 ament_package()

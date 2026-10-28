@@ -11,7 +11,6 @@
   <depend>e_stop_manager_msgs</depend>
   <depend>generate_parameter_lib_validators</depend>
   <depend>generate_parameter_library</depend>
-  <depend>parameter_traits</depend>
   <depend>rclcpp</depend>
   <depend>rclcpp_components</depend>
   <depend>std_msgs</depend>

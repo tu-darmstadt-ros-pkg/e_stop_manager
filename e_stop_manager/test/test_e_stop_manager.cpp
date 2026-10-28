@@ -365,6 +365,32 @@ TEST_F( EStopManagerTest, InvalidEStopName )
   EXPECT_FALSE( test_client_->e_stop_list_msgs_.waitForMessage( 200ms ) );
 }
 
+TEST_F( EStopManagerTest, IncompatibleQosPublisherTriggersTrackedEStop )
+{
+  const std::string e_stop = "hard_remote_e_stop";
+  const std::string aggregated = "emergency_stop_hardware";
+
+  test_client_->waitForConnection();
+  test_client_->resetStartState();
+  test_client_->waitForMsgAndVerifyState( true );
+  test_client_->resetAllMsgContainers();
+
+  // default QoS is volatile, which is incompatible with the transient_local subscription of the manager
+  auto volatile_pub =
+      test_client_->node_->create_publisher<std_msgs::msg::Bool>( "/" + NODE_NAME + "/" + e_stop, rclcpp::QoS( rclcpp::KeepLast( 10 ) ) );
+  test_client_->e_stop_state_[e_stop] = true;
+
+  // discovery of the incompatible publisher may take a moment
+  ASSERT_TRUE( test_client_->aggregated_msgs_.at( aggregated )->waitForMessage( 2s ) );
+  test_client_->waitForMsgAndVerifyState( false );
+
+  // a compatible publisher can still release the e-stop
+  volatile_pub.reset();
+  test_client_->resetAllMsgContainers();
+  test_client_->publishTracked( e_stop, false );
+  test_client_->waitForMsgAndVerifyState( false );
+}
+
 int main( int argc, char **argv )
 {
   ::testing::InitGoogleTest( &argc, argv );

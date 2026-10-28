@@ -1,3 +1,6 @@
+#ifndef E_STOP_MANAGER_E_STOP_MANAGER_H
+#define E_STOP_MANAGER_E_STOP_MANAGER_H
+
 #include "rclcpp/publisher.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/bool.hpp"
@@ -24,6 +27,7 @@ private:
   static std::string sanitizeTopicName( const std::string &name );
   void publishEStops();
 
+  void createTrackedSubscription( const std::string &name, const rclcpp::QoS &qos );
   void handleTrackedUpdate( const std::string &name, bool value );
 
   void setEStopServiceCB( std::shared_ptr<e_stop_manager_msgs::srv::SetEStop::Request> request,
@@ -43,3 +47,5 @@ private:
   rclcpp::Node::SharedPtr node_;
 };
 } // namespace e_stop_manager
+
+#endif // E_STOP_MANAGER_E_STOP_MANAGER_H

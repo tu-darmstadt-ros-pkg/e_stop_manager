@@ -5,7 +5,7 @@ e_stop_manager_config:
     validation:
       unique<>: null
       not_empty<>: null
-      "generate_parameter_lib_validators::valid_topic_name": null
+      "generate_parameter_lib_validators::valid_relative_topic_name": null
 
   e_stop_config:
     __map_e_stop_names:

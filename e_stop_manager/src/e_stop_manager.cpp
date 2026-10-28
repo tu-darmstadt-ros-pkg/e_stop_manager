@@ -4,6 +4,7 @@
 #include <cctype>
 #include <functional>
 #include <set>
+#include <stdexcept>
 
 namespace e_stop_manager
 {
@@ -45,9 +46,7 @@ EStopManager::EStopManager( const rclcpp::NodeOptions &options ) : node_( std::m
     aggregated_members_[overall_aggregated_topic].push_back( e_stop_name );
 
     if ( config.tracked_topic ) {
-      tracked_subscriptions_[e_stop_name] = node_->create_subscription<std_msgs::msg::Bool>(
-          "~/" + e_stop_name, reliable_transient_qos,
-          [this, e_stop_name]( const std_msgs::msg::Bool::SharedPtr msg ) { this->handleTrackedUpdate( e_stop_name, msg->data ); } );
+      createTrackedSubscription( e_stop_name, reliable_transient_qos );
     } else {
       managed_publishers_[e_stop_name] = node_->create_publisher<std_msgs::msg::Bool>( "~/" + e_stop_name, reliable_transient_qos );
     }
@@ -64,6 +63,32 @@ EStopManager::EStopManager( const rclcpp::NodeOptions &options ) : node_( std::m
 
   publishEStops();
   RCLCPP_INFO( node_->get_logger(), "e_stop_manager initialized with %zu e-stops.", params_.e_stop_names.size() );
+}
+
+void EStopManager::createTrackedSubscription( const std::string &name, const rclcpp::QoS &qos )
+{
+  const auto callback = [this, name]( const std_msgs::msg::Bool::SharedPtr msg ) { this->handleTrackedUpdate( name, msg->data ); };
+
+  // A publisher with incompatible QoS (e.g. volatile) never delivers messages to this subscription.
+  // Fail safe: trigger the e-stop instead of silently treating it as released.
+  rclcpp::SubscriptionOptions options;
+  options.event_callbacks.incompatible_qos_callback = [this, name]( rclcpp::QOSRequestedIncompatibleQoSInfo &info ) {
+    RCLCPP_ERROR( node_->get_logger(),
+                  "Publisher with incompatible QoS (policy id %d) on tracked e-stop '%s'. Its messages cannot be received, "
+                  "triggering the e-stop. Tracked e-stops must be published as reliable and transient_local.",
+                  info.last_policy_kind, name.c_str() );
+    this->handleTrackedUpdate( name, true );
+  };
+
+  try {
+    tracked_subscriptions_[name] = node_->create_subscription<std_msgs::msg::Bool>( "~/" + name, qos, callback, options );
+  } catch ( const rclcpp::UnsupportedEventTypeException & ) {
+    RCLCPP_WARN( node_->get_logger(),
+                 "RMW does not support incompatible QoS events. A tracked e-stop '%s' publisher with incompatible QoS "
+                 "will not be detected.",
+                 name.c_str() );
+    tracked_subscriptions_[name] = node_->create_subscription<std_msgs::msg::Bool>( "~/" + name, qos, callback );
+  }
 }
 
 void EStopManager::handleTrackedUpdate( const std::string &name, bool value )
@@ -121,13 +146,16 @@ void EStopManager::setEStopServiceCB( const std::shared_ptr<e_stop_manager_msgs:
 std::string EStopManager::sanitizeTopicName( const std::string &name )
 {
   // due to the validator used the topic is already valid
-  // here we only remove leasing '~' or '/' if present, since we use the topic name as part of another topic
+  // here we only remove leading '~' or '/' if present, since we use the topic name as part of another topic
   std::string sanitized_name = name;
-  if ( name.front() == '~' ) {
+  if ( !sanitized_name.empty() && sanitized_name.front() == '~' ) {
     sanitized_name.erase( 0, 1 );
   }
-  if ( sanitized_name.front() == '/' ) {
+  if ( !sanitized_name.empty() && sanitized_name.front() == '/' ) {
     sanitized_name.erase( 0, 1 );
+  }
+  if ( sanitized_name.empty() ) {
+    throw std::invalid_argument( "Aggregated topic '" + name + "' is empty after removing the leading '~' or '/'." );
   }
   return sanitized_name;
 }
