@@ -26,6 +26,8 @@ rclcpp::NodeOptions options( const std::vector<rclcpp::Parameter> &overrides )
       rclcpp::Parameter( "e_stop_names", std::vector<std::string>{ "remote", "ui" } ),
       rclcpp::Parameter( "e_stop_config.remote.aggregated_topic", "emergency_stop_hardware" ),
       rclcpp::Parameter( "e_stop_config.remote.tracked_topic", true ),
+      // Engaged at start, so a release is observable.
+      rclcpp::Parameter( "e_stop_config.remote.initial_value", true ),
       rclcpp::Parameter( "e_stop_config.ui.aggregated_topic", "emergency_stop_software" ),
       rclcpp::Parameter( "e_stop_config.ui.tracked_topic", false ),
   };
@@ -54,6 +56,7 @@ protected:
     executor_.add_node( manager_->get_node_base_interface() );
     executor_.add_node( client_ );
     spin_thread_ = std::thread( [this] { executor_.spin(); } );
+    ASSERT_TRUE( waitFor( [this] { return hardware_count_ >= 1; }, 2s ) );
   }
 
   void TearDown() override
@@ -142,14 +145,15 @@ TEST_F( EStopPublisherGraceTest, UnsetGraceKeepsReleaseAfterPublisherLeaves )
   ASSERT_TRUE( waitFor( [this] { return !hardware_engaged_; }, 2s ) );
   publisher.reset();
 
+  const int engaged_before = hardwareEngagedCount();
   std::this_thread::sleep_for( 1500ms );
-  EXPECT_EQ( hardwareEngagedCount(), 0 );
+  EXPECT_EQ( hardwareEngagedCount(), engaged_before );
 }
 
 TEST_F( EStopPublisherGraceTest, SourceWithoutPublisherKeepsInitialValue )
 {
-  start( { rclcpp::Parameter( "publisher_grace_ms", 200 ) } );
-  ASSERT_TRUE( waitFor( [this] { return hardware_count_ >= 1; }, 2s ) );
+  start( { rclcpp::Parameter( "publisher_grace_ms", 200 ), rclcpp::Parameter( "e_stop_config.remote.initial_value", false ) } );
+  ASSERT_FALSE( hardwareEngaged() );
 
   std::this_thread::sleep_for( 1s );
   EXPECT_EQ( hardwareEngagedCount(), 0 );
@@ -172,7 +176,7 @@ TEST_F( EStopPublisherGraceTest, OneShotReleaseLastsOnlyTheGrace )
   publisher->publish( Bool().set__data( false ) );
   publisher.reset();
 
-  std::this_thread::sleep_for( 500ms );
+  ASSERT_TRUE( waitFor( [this] { return !hardware_engaged_; }, 2s ) );
   EXPECT_TRUE( waitFor( [this] { return hardware_engaged_; }, 2s ) );
 }
 
@@ -183,14 +187,16 @@ TEST_F( EStopPublisherGraceTest, ReleaseHoldsWhilePublisherStays )
   publisher->publish( Bool().set__data( false ) );
   ASSERT_TRUE( waitFor( [this] { return !hardware_engaged_; }, 2s ) );
 
+  const int engaged_before = hardwareEngagedCount();
   std::this_thread::sleep_for( 1s );
-  EXPECT_EQ( hardwareEngagedCount(), 0 );
+  EXPECT_EQ( hardwareEngagedCount(), engaged_before );
 }
 
 TEST_F( EStopPublisherGraceTest, ReleaseRefreshesTheGrace )
 {
   start( { rclcpp::Parameter( "publisher_grace_ms", 1000 ) } );
-  // An expired grace, so only the release itself can hold the source.
+  // An expired grace, so only the release itself can hold the source. A check may still count the
+  // short lived publisher, PublisherGraceTest.MessageAfterExpiryRefreshesGrace covers the refresh alone.
   releaseAndLosePublisher();
 
   auto one_shot = createRemotePublisher();

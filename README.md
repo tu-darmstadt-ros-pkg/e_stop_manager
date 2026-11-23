@@ -121,6 +121,8 @@ With `publisher_grace_ms` set, a tracked source that had a publisher or a messag
 * A source that never had a publisher keeps its `initial_value`, so the robot can start without every source present.
 * A one shot release from a publisher that leaves right away lasts only for the grace.
 * The grace keeps a latched message that arrives before its publisher is counted.
+* The source stays released while any publisher on its topic remains.
+* A crashed publisher counts as gone only once the middleware drops it, which on Cyclone DDS takes its lease duration (10 s by default) on top of the grace.
 
 ---
 
