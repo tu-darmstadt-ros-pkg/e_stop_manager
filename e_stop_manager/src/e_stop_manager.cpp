@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <functional>
 #include <set>
 #include <stdexcept>
@@ -9,10 +10,19 @@
 namespace e_stop_manager
 {
 
+namespace
+{
+constexpr std::chrono::milliseconds PUBLISHER_CHECK_PERIOD( 100 );
+}
+
 EStopManager::EStopManager( const rclcpp::NodeOptions &options ) : node_( std::make_shared<rclcpp::Node>( "e_stop_manager", options ) )
 {
   param_listener_ = std::make_unique<e_stop_manager_config::ParamListener>( node_ );
   params_ = param_listener_->get_params();
+  if ( params_.publisher_grace_ms != 0 && params_.publisher_grace_ms < PUBLISHER_CHECK_PERIOD.count() ) {
+    throw std::invalid_argument( "publisher_grace_ms must be 0 or at least " + std::to_string( PUBLISHER_CHECK_PERIOD.count() ) +
+                                 " ms, got " + std::to_string( params_.publisher_grace_ms ) + "." );
+  }
 
   const auto reliable_transient_qos = rclcpp::QoS( rclcpp::KeepLast( 1 ) ).reliable().transient_local();
 
@@ -62,12 +72,19 @@ EStopManager::EStopManager( const rclcpp::NodeOptions &options ) : node_( std::m
       "~/set_e_stop", std::bind( &EStopManager::setEStopServiceCB, this, std::placeholders::_1, std::placeholders::_2 ) );
 
   publishEStops();
+  if ( params_.publisher_grace_ms > 0 ) {
+    publisher_check_timer_ = node_->create_wall_timer( PUBLISHER_CHECK_PERIOD, [this] { checkTrackedPublishers(); } );
+  }
   RCLCPP_INFO( node_->get_logger(), "e_stop_manager initialized with %zu e-stops.", params_.e_stop_names.size() );
 }
 
 void EStopManager::createTrackedSubscription( const std::string &name, const rclcpp::QoS &qos )
 {
-  const auto callback = [this, name]( const std_msgs::msg::Bool::SharedPtr msg ) { this->handleTrackedUpdate( name, msg->data ); };
+  publisher_graces_.emplace( name, PublisherGrace( std::chrono::milliseconds( params_.publisher_grace_ms ) ) );
+  const auto callback = [this, name]( const std_msgs::msg::Bool::SharedPtr msg ) {
+    publisher_graces_.at( name ).messageReceived( PublisherGrace::Clock::now() );
+    this->handleTrackedUpdate( name, msg->data );
+  };
 
   // A publisher with incompatible QoS (e.g. volatile) never delivers messages to this subscription.
   // Fail safe: trigger the e-stop instead of silently treating it as released.
@@ -88,6 +105,21 @@ void EStopManager::createTrackedSubscription( const std::string &name, const rcl
                  "will not be detected.",
                  name.c_str() );
     tracked_subscriptions_[name] = node_->create_subscription<std_msgs::msg::Bool>( "~/" + name, qos, callback );
+  }
+}
+
+void EStopManager::checkTrackedPublishers()
+{
+  const auto now = PublisherGrace::Clock::now();
+  for ( const auto &[name, subscription] : tracked_subscriptions_ ) {
+    if ( !publisher_graces_.at( name ).expired( subscription->get_publisher_count(), now ) ) {
+      continue;
+    }
+    if ( !e_stop_state_.at( name ) ) {
+      RCLCPP_ERROR( node_->get_logger(), "Tracked e-stop '%s' has had no publisher for %lld ms, triggering the e-stop.", name.c_str(),
+                    static_cast<long long>( params_.publisher_grace_ms ) );
+    }
+    handleTrackedUpdate( name, true );
   }
 }
 

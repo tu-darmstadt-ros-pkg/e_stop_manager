@@ -1,4 +1,9 @@
 e_stop_manager_config:
+  publisher_grace_ms:
+    type: int
+    default_value: 0
+    read_only: true
+    description: "A tracked source that had a publisher counts as triggered once it has had no publisher for this long since its last message or last counted publisher. 0 disables this, else at least 100."
   e_stop_names:
     type: string_array
     read_only: true

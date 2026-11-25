@@ -108,6 +108,22 @@ Each source must specify:
 
 All aggregated groups are derived from the `aggregated_topic` values in `e_stop_config`, so no separate list is needed.
 
+### **Optional parameters**
+
+| Parameter            | Type | Default | Meaning |
+| -------------------- | ---- | ------- | ------- |
+| `publisher_grace_ms` | int  | `0`     | Publisher grace for tracked sources, see below. `0` disables it, other values must be at least 100. |
+
+#### **Publisher grace**
+
+With `publisher_grace_ms` set, a tracked source that had a publisher or a message counts as triggered once it has had no publisher for longer than the grace since its last message or the last time a publisher was counted (checked every 100 ms). It stays triggered until a message releases it again. This catches a source whose node died while its last latched value said released.
+
+* A source that never had a publisher keeps its `initial_value`, so the robot can start without every source present.
+* A one shot release from a publisher that leaves right away lasts only for the grace.
+* The grace keeps a latched message that arrives before its publisher is counted.
+* The source stays released while any publisher on its topic remains.
+* A crashed publisher counts as gone only once the middleware drops it, which on Cyclone DDS takes its lease duration (10 s by default) on top of the grace.
+
 ---
 
 # **Example Configuration**

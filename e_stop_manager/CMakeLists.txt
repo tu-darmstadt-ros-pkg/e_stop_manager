@@ -46,6 +46,7 @@ target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME} rclcpp::rclcpp)
 # ------------------------------------------------------------------------------
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
+  find_package(ament_cmake_ros REQUIRED)
   find_package(ros_testing REQUIRED)
   ament_add_gtest_executable(${PROJECT_NAME}_test test/test_e_stop_manager.cpp)
 
@@ -54,6 +55,11 @@ if(BUILD_TESTING)
 
   add_ros_test(test/test_e_stop_manager.launch.py ARGS
                "test_binary_dir:=${CMAKE_CURRENT_BINARY_DIR}")
+
+  ament_add_ros_isolated_gtest(${PROJECT_NAME}_publisher_grace_test
+                               test/test_e_stop_publisher_grace.cpp)
+  target_link_libraries(${PROJECT_NAME}_publisher_grace_test ${PROJECT_NAME}
+                        rclcpp::rclcpp ${std_msgs_TARGETS})
 endif()
 
 # ------------------------------------------------------------------------------

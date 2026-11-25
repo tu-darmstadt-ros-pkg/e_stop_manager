@@ -5,6 +5,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include <e_stop_manager/e_stop_manager_parameters.hpp>
+#include <e_stop_manager/publisher_grace.h>
 #include <e_stop_manager_msgs/msg/e_stop_list.hpp>
 #include <e_stop_manager_msgs/srv/set_e_stop.hpp>
 #include <map>
@@ -29,6 +30,7 @@ private:
 
   void createTrackedSubscription( const std::string &name, const rclcpp::QoS &qos );
   void handleTrackedUpdate( const std::string &name, bool value );
+  void checkTrackedPublishers();
 
   void setEStopServiceCB( std::shared_ptr<e_stop_manager_msgs::srv::SetEStop::Request> request,
                           std::shared_ptr<e_stop_manager_msgs::srv::SetEStop::Response> response );
@@ -42,6 +44,8 @@ private:
   std::map<std::string, std::shared_ptr<rclcpp::Subscription<std_msgs::msg::Bool>>> tracked_subscriptions_;
   std::map<std::string, std::shared_ptr<rclcpp::Publisher<std_msgs::msg::Bool>>> managed_publishers_;
   std::map<std::string, bool> e_stop_state_;
+  std::map<std::string, PublisherGrace> publisher_graces_;
+  rclcpp::TimerBase::SharedPtr publisher_check_timer_;
   e_stop_manager_config::Params params_;
   std::unique_ptr<e_stop_manager_config::ParamListener> param_listener_;
   rclcpp::Node::SharedPtr node_;
